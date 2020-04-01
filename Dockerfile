@@ -30,38 +30,33 @@ RUN git clone https://github.com/google/protobuf.git && \
 
 RUN pip install --upgrade pip
 
-RUN pip install numpy \
-                scipy \
+RUN pip install numpy==1.16.0 \
+                scipy==1.2.0 \
                 zmq \
                 pyzmq \
                 Pillow \
                 gym \
                 protobuf \
-                pyyaml \
+                pyyaml 
+
 
 RUN git clone https://github.com/f1tenth/f1tenth_gym
 
 RUn cd f1tenth_gym && \
-    mkdir -p build && \
+    mkdir build && \
     cd build && \
     cmake .. && \
     make
 
-RUN cp build/sim_request_pb2.py gym/
+RUN cd f1tenth_gym && \
+    cp ./build/sim_requests_pb2.py ./gym/ && \
+    pip install -e gym/
 
-RUN pip install -e gym/
-
-RUN source /opt/ros/melodic/setup.bash
-
-RUN cd .. && \
-    mkdir -p catkin_ws/src && \
-    cd catkin_ws && \
-    catkin_make
+RUN /bin/bash -c "source /opt/ros/melodic/setup.bash; mkdir -p catkin_ws/src; cd catkin_ws; catkin_make"
 
 COPY . /catkin_ws/src
 
-RUN catkin_make && \
-    source devel/setup.bash
+RUN /bin/bash -c "source /opt/ros/melodic/setup.bash; cd catkin_ws; catkin_make; source devel/setup.bash"
 
 
 CMD ["roslaunch", "f1tenth_gym_ros gym_bridge.launch"]
