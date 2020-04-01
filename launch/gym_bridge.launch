@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<launch>
+  
+  <!-- Launch a map from the maps folder-->
+  <arg name="map" default="$(find f1tenth_gym_ros)/maps/skirk.yaml"/>
+  <node pkg="map_server" name="map_server" type="map_server" args="$(arg map)"/>
+
+  <!-- Launch Rviz -->
+  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find f1tenth_gym_ros)/launch/gym_bridge.rviz" output="screen"/>
+
+  <!-- Launch robot model -->
+  <include file="$(find f1tenth_gym_ros)/launch/racecar_model.launch"/>
+
+  <!-- Launch gym bridge node -->
+  <rosparam command="load" file="$(find f1tenth_gym_ros)/params.yaml"/>
+  <node pkg="f1tenth_gym_ros" name="gym_bridge" type="gym_bridge.py" output="screen"/>
+
+</launch>
