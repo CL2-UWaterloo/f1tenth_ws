@@ -32,15 +32,12 @@ RUN pip install --upgrade pip
 
 RUN pip install numpy \
                 scipy \
-                numba \
-                matplotlib \
                 zmq \
                 pyzmq \
                 Pillow \
                 gym \
                 protobuf \
                 pyyaml \
-                msgpack==0.6.2
 
 RUN git clone https://github.com/f1tenth/f1tenth_gym
 
@@ -54,7 +51,20 @@ RUN cp build/sim_request_pb2.py gym/
 
 RUN pip install -e gym/
 
-ENTRYPOINT ["/bin/bash"]
+RUN source /opt/ros/melodic/setup.bash
+
+RUN cd .. && \
+    mkdir -p catkin_ws/src && \
+    cd catkin_ws && \
+    catkin_make
+
+COPY . /catkin_ws/src
+
+RUN catkin_make && \
+    source devel/setup.bash
+
+
+CMD ["roslaunch", "f1tenth_gym_ros gym_bridge.launch"]
 
 
 # CMD ["roslaunch", "package file.launch"]

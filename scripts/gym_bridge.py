@@ -32,8 +32,10 @@ class GymBridge(object):
         initial_state = {'x':[0.0, 2.0], 'y': [0.0, 0.0], 'theta': [0.0, 0.0]}
         self.obs, _, self.done, _ = self.racecar_env.reset(initial_state)
         self.ego_pose = [0., 0., 0.]
+        self.ego_vel = [0., 0., 0.]
         self.ego_steer = 0.0
         self.opp_pose = [2., 0., 0.]
+        self.opp_vel = [0., 0., 0.]
         self.opp_steer = 0.0
 
         # transform broadcaster
@@ -50,7 +52,7 @@ class GymBridge(object):
 
 
     def drive_callback(self, drive_msg):
-        # TODO: trigger opp agent plan, step env, update pose and steer
+        # TODO: trigger opp agent plan, step env, update pose and steer and vel
         ego_speed = drive_msg.drive.speed
         self.ego_steer = drive_msg.drive.steering_angle
         opp_speed, self.opp_steer = self.opp_agent.plan(self.obs)
@@ -58,6 +60,38 @@ class GymBridge(object):
         action = {}
         obs, step_reward, done, info = self.racecar_env.step(action)
 
+    def publish_odom(self, ts):
+        ego_odom = Odometry()
+        ego_odom.header.stamp = ts
+        ego_odom.header.frame_id = '/map'
+        ego_odom.child_frame_id = 'ego_racecar/base_link'
+        ego_odom.pose.pose.position.x = self.ego_pose[0]
+        ego_odom.pose.pose.position.y = self.ego_pose[1]
+        ego_quat = quaternion_from_euler(0., 0., self.ego_pose[2])
+        ego_odom.pose.pose.orientation.x = ego_quat[0]
+        ego_odom.pose.pose.orientation.y = ego_quat[1]
+        ego_odom.pose.pose.orientation.z = ego_quat[2]
+        ego_odom.pose.pose.orientation.w = ego_quat[3]
+        ego_odom.twist.twist.linear.x = self.ego_speed[0]
+        ego_odom.twist.twist.linear.y = self.ego_speed[1]
+        ego_odom.twist.twist.angular.z = self.ego_speed[2]
+        self.ego_odom_pub.publish(ego_odom)
+
+        opp_odom = Odometry()
+        opp_odom.header.stamp = ts
+        opp_odom.header.frame_id = '/map'
+        opp_odom.child_frame_id = 'opp_racecar/base_link'
+        opp_odom.pose.pose.position.x = self.opp_pose[0]
+        opp_odom.pose.pose.position.y = self.opp_pose[1]
+        opp_quat = quaternion_from_euler(0., 0., self.opp_pose[2])
+        opp_odom.pose.pose.orientation.x = opp_quat[0]
+        opp_odom.pose.pose.orientation.y = opp_quat[1]
+        opp_odom.pose.pose.orientation.z = opp_quat[2]
+        opp_odom.pose.pose.orientation.w = opp_quat[3]
+        opp_odom.twist.twist.linear.x = self.opp_speed[0]
+        opp_odom.twist.twist.linear.y = self.opp_speed[1]
+        opp_odom.twist.twist.angular.z = self.opp_speed[2]
+        self.opp_odom_pub.publish(opp_odom)
 
     def publish_transforms(self, ts):
         ego_t = Transform()
@@ -127,4 +161,27 @@ class GymBridge(object):
         opp_wheel_ts.child_frame_id = 'opp_racecar/front_right_wheel'
         self.br.sendTransform(opp_wheel_ts)
 
-        
+    def publish_laser_transforms(self, ts):
+        ego_scan_ts = TransformStamped()
+        ego_scan_ts.transform.translation.x = self.scan_distance_to_base_link
+        ego_scan_ts.transform.rotation.w = 1.
+        ego_scan_ts.header.stamp = ts
+        #TODO: check frame names
+        ego_scan_ts.header.frame_id = 'ego_racecar/base_link'
+        ego_scan_ts.child_frame_id = 'ego_racecar/laser'
+        self.br.sendTransform(ego_scan_ts)
+
+        opp_scan_ts = TransformStamped()
+        opp_scan_ts.transform.translation.x = self.scan_distance_to_base_link
+        opp_scan_ts.transform.rotation.w = 1.
+        opp_scan_ts.header.stamp = ts
+        #TODO: check frame names
+        opp_scan_ts.header.frame_id = 'opp_racecar/base_link'
+        opp_scan_ts.child_frame_id = 'opp_racecar/laser'
+        self.br.sendTransform(opp_scan_ts)
+
+
+if __name__ == '__main__':
+    rospy.init_node('gym_bridge')
+    gym_bridge = GymBridge()
+    rospy.spin()
