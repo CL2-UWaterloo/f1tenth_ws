@@ -1,4 +1,4 @@
 ego_scan_topic: '/scan'
 ego_odom_topic: '/odom'
-opp_doom_topic: '/opp_odom'
+opp_odom_topic: '/opp_odom'
 ego_drive_topic: '/drive'

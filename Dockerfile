@@ -1,4 +1,4 @@
-FROM ros:melodic-ros-base
+FROM ros:melodic-robot-bionic
 
 ENV IM_IN_DOCKER Yes
 
@@ -13,7 +13,10 @@ RUN apt-get install -y libzmq3-dev \
                        libtool \
                        libeigen3-dev \
                        cmake \
-                       vim
+                       vim \
+                       ros-melodic-ackermann-msgs \
+                       ros-melodic-map-server
+
 
 RUN cp -r /usr/include/eigen3/Eigen /usr/include
 
