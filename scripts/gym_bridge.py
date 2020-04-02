@@ -51,6 +51,9 @@ class GymBridge(object):
         self.opp_vel = [0., 0., 0.]
         self.opp_steer = 0.0
 
+        # keep track of latest sim state
+        self.ego_scan = self.obs['scans'][0]
+
         # transform broadcaster
         self.br = transform_broadcaster.TransformBroadcaster()
 
@@ -63,7 +66,7 @@ class GymBridge(object):
         self.drive_sub = rospy.Subscriber(self.ego_drive_topic, AckermannDriveStamped, self.drive_callback, queue_size=1)
 
         # Timer
-        self.timer = rospy.Timer(rospy.Duration(0.1), self.timer_callback)
+        self.timer = rospy.Timer(rospy.Duration(0.002), self.timer_callback)
 
 
     def drive_callback(self, drive_msg):
@@ -77,7 +80,11 @@ class GymBridge(object):
         obs, step_reward, done, info = self.racecar_env.step(action)
 
     def timer_callback(self, timer):
-        print('update')
+        # pub scan
+        scan = LaserScan()
+        self.ego_scan_pub.publish(scan)
+
+        # print('update')
 
     def publish_odom(self, ts):
         ego_odom = Odometry()
