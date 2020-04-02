@@ -102,11 +102,11 @@ class GymBridge(object):
         self.ego_steer = drive_msg.drive.steering_angle
         # opp_speed, self.opp_steer = self.opp_agent.plan(self.obs)
 
-        action = {'ego_idx': 0, 'speed': [ego_speed, 0.2], 'steer': [self.ego_steer, 0.2]}
+        action = {'ego_idx': 0, 'speed': [ego_speed, 0.0], 'steer': [self.ego_steer, 0.0]}
         self.obs, step_reward, self.done, info = self.racecar_env.step(action)
 
         self.update_sim_state()
-        print(self.ego_pose)
+        print(self.obs['collisions'])
 
     def timer_callback(self, timer):
         ts = rospy.Time.now()
