@@ -23,12 +23,25 @@ class GymBridge(object):
 
         self.ego_drive_topic = rospy.get_param('ego_drive_topic')
 
+        self.map_path = rospy.get_param('map_path')
+        self.map_img_ext = rospy.get_param('map_img_ext')
+        exec_dir = rospy.get_param('executable_dir')
+
+        mass= 3.74
+        l_r = 0.17145
+        I_z = 0.04712
+        mu = 0.523
+        h_cg = 0.074
+        cs_f = 4.718
+        cs_r = 5.4562
         # init gym backend
         self.racecar_env = gym.make('f110_gym:f110-v0')
+        self.racecar_env.init_map(self.map_path, self.map_img_ext, False, False)
+        self.racecar_env.update_params(mu, h_cg, l_r, cs_f, cs_r, I_z, mass, exec_dir)
 
         # init opponent agent
         # TODO: init by params.yaml
-        self.opp_agent = blah
+        self.opp_agent = None
         initial_state = {'x':[0.0, 2.0], 'y': [0.0, 0.0], 'theta': [0.0, 0.0]}
         self.obs, _, self.done, _ = self.racecar_env.reset(initial_state)
         self.ego_pose = [0., 0., 0.]
@@ -43,15 +56,18 @@ class GymBridge(object):
 
         # pubs
         self.ego_scan_pub = rospy.Publisher(self.ego_scan_topic, LaserScan, queue_size=1)
-        self.opp_scan_pub = rospy.Publisher(self.opp_scan_topic, LaserScan, queue_size=1)
         self.ego_odom_pub = rospy.Publisher(self.ego_odom_topic, Odometry, queue_size=1)
         self.opp_odom_pub = rospy.Publisher(self.opp_odom_topic, Odometry, queue_size=1)
 
         # subs
         self.drive_sub = rospy.Subscriber(self.ego_drive_topic, AckermannDriveStamped, self.drive_callback, queue_size=1)
 
+        # Timer
+        self.timer = rospy.Timer(rospy.Duration(0.1), self.timer_callback)
+
 
     def drive_callback(self, drive_msg):
+        print('in drive callback')
         # TODO: trigger opp agent plan, step env, update pose and steer and vel
         ego_speed = drive_msg.drive.speed
         self.ego_steer = drive_msg.drive.steering_angle
@@ -59,6 +75,9 @@ class GymBridge(object):
 
         action = {}
         obs, step_reward, done, info = self.racecar_env.step(action)
+
+    def timer_callback(self, timer):
+        print('update')
 
     def publish_odom(self, ts):
         ego_odom = Odometry()

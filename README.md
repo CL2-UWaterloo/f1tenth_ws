@@ -28,6 +28,12 @@ Next, in a new terminal in the host system, check everything is working by:
 $ rostopic list
 ```
 
+When you're creating your own launch file to launch your node, please include ```gym_bridge_host.launch``` in the ```launch``` directory in your own launch file by putting this line in your launch file:
+
+```xml
+<include file="$(find f1tenth_gym_ros)/launch/gym_bridge_host.launch"/>
+```
+
 # TODO
 1) Full system tests
 2) Integrate example test agents
