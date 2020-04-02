@@ -14,3 +14,5 @@ executable_dir: '/f1tenth_gym/build/'
 scan_fov: 4.7
 scan_beams: 1080
 scan_distance_to_base_link: 0.275
+
+waypoints_path: '/catkin_ws/src/f1tenth_gym_ros/maps/skirk.csv'

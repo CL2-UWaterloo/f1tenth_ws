@@ -12,7 +12,7 @@ class Agent(object):
     def scan_callback(self, scan_msg):
         # print('got scan, now plan')
         drive = AckermannDriveStamped()
-        drive.drive.speed = 0.3
+        drive.drive.speed = 0.0
         self.drive_pub.publish(drive)
 
 if __name__ == '__main__':

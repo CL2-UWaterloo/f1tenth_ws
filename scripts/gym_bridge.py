@@ -11,7 +11,8 @@ from tf2_ros import transform_broadcaster
 from tf.transformations import quaternion_from_euler
 
 import numpy as np
-import zmq
+
+from agents import PurePursuitAgent
 
 import gym
 class GymBridge(object):
@@ -34,8 +35,10 @@ class GymBridge(object):
         self.angle_min = -scan_fov / 2.
         self.angle_max = scan_fov/ 2.
         self.angle_inc = scan_fov / scan_beams
-        
 
+        csv_path = rospy.get_param('waypoints_path')
+        
+        wheelbase = 0.3302
         mass= 3.74
         l_r = 0.17145
         I_z = 0.04712
@@ -50,7 +53,7 @@ class GymBridge(object):
 
         # init opponent agent
         # TODO: init by params.yaml
-        self.opp_agent = None
+        self.opp_agent = PurePursuitAgent(csv_path, wheelbase)
         initial_state = {'x':[0.0, 2.0], 'y': [0.0, 0.0], 'theta': [0.0, 0.0]}
         self.obs, _, self.done, _ = self.racecar_env.reset(initial_state)
         self.ego_pose = [0., 0., 0.]
@@ -100,9 +103,9 @@ class GymBridge(object):
         # TODO: trigger opp agent plan, step env, update pose and steer and vel
         ego_speed = drive_msg.drive.speed
         self.ego_steer = drive_msg.drive.steering_angle
-        # opp_speed, self.opp_steer = self.opp_agent.plan(self.obs)
+        opp_speed, self.opp_steer = self.opp_agent.plan(self.obs)
 
-        action = {'ego_idx': 0, 'speed': [ego_speed, 0.0], 'steer': [self.ego_steer, 0.0]}
+        action = {'ego_idx': 0, 'speed': [ego_speed, opp_speed], 'steer': [self.ego_steer, self.opp_steer]}
         self.obs, step_reward, self.done, info = self.racecar_env.step(action)
 
         self.update_sim_state()
