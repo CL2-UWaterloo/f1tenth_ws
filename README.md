@@ -44,4 +44,4 @@ An example agent launch file is in ```launch/agent_template.launch```
 - [ ] Since we have timer update instead of action stepping, what is the notion of 'done'?
 - [x] Integrate example test agents
 - [ ] Integrate competent racing agents (with random order when testing)
-- [ ] Fix mismatch between ray casted scan and robot model
+- [x] Fix mismatch between ray casted scan and robot model
