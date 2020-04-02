@@ -29,6 +29,13 @@ class GymBridge(object):
         self.map_img_ext = rospy.get_param('map_img_ext')
         exec_dir = rospy.get_param('executable_dir')
 
+        scan_fov = rospy.get_param('scan_fov')
+        scan_beams = rospy.get_param('scan_beams')
+        self.angle_min = -scan_fov / 2.
+        self.angle_max = scan_fov/ 2.
+        self.angle_inc = scan_fov / scan_beams
+        
+
         mass= 3.74
         l_r = 0.17145
         I_z = 0.04712
@@ -54,7 +61,7 @@ class GymBridge(object):
         self.opp_steer = 0.0
 
         # keep track of latest sim state
-        self.ego_scan = self.obs['scans'][0]
+        self.ego_scan = list(self.obs['scans'][0])
 
         # transform broadcaster
         self.br = transform_broadcaster.TransformBroadcaster()
@@ -70,16 +77,36 @@ class GymBridge(object):
         # Timer
         self.timer = rospy.Timer(rospy.Duration(0.002), self.timer_callback)
 
+    def update_sim_state(self):
+        self.ego_scan = list(self.obs['scans'][0])
+
+        self.ego_pose[0] = self.obs['poses_x'][0]
+        self.ego_pose[1] = self.obs['poses_y'][0]
+        self.ego_pose[2] = self.obs['poses_theta'][0]
+        self.ego_speed[0] = self.obs['linear_vels_x'][0]
+        self.ego_speed[1] = self.obs['linear_vels_y'][0]
+        self.ego_speed[2] = self.obs['ang_vels_z'][0]
+
+        self.opp_pose[0] = self.obs['poses_x'][1]
+        self.opp_pose[1] = self.obs['poses_y'][1]
+        self.opp_pose[2] = self.obs['poses_theta'][1]
+        self.opp_speed[0] = self.obs['linear_vels_x'][1]
+        self.opp_speed[1] = self.obs['linear_vels_y'][1]
+        self.opp_speed[2] = self.obs['ang_vels_z'][1]
+
 
     def drive_callback(self, drive_msg):
-        print('in drive callback')
+        # print('in drive callback')
         # TODO: trigger opp agent plan, step env, update pose and steer and vel
         ego_speed = drive_msg.drive.speed
         self.ego_steer = drive_msg.drive.steering_angle
-        opp_speed, self.opp_steer = self.opp_agent.plan(self.obs)
+        # opp_speed, self.opp_steer = self.opp_agent.plan(self.obs)
 
-        action = {}
-        obs, step_reward, done, info = self.racecar_env.step(action)
+        action = {'ego_idx': 0, 'speed': [ego_speed, 0.2], 'steer': [self.ego_steer, 0.2]}
+        self.obs, step_reward, self.done, info = self.racecar_env.step(action)
+
+        self.update_sim_state()
+        print(self.ego_pose)
 
     def timer_callback(self, timer):
         ts = rospy.Time.now()
@@ -88,6 +115,11 @@ class GymBridge(object):
         scan = LaserScan()
         scan.header.stamp = ts
         scan.header.frame_id = 'ego_racecar/laser'
+        scan.angle_min = self.angle_min
+        scan.angle_max = self.angle_max
+        scan.angle_increment = self.angle_inc
+        scan.range_min = 0.
+        scan.range_max = 30.
         scan.ranges = self.ego_scan
         self.ego_scan_pub.publish(scan)
 

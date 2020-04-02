@@ -34,6 +34,12 @@ When you're creating your own launch file to launch your node, please include ``
 <include file="$(find f1tenth_gym_ros)/launch/gym_bridge_host.launch"/>
 ```
 
+An example agent launch file is in ```launch/agent_template.launch```
+
 # TODO
-1) Full system tests
-2) Integrate example test agents
+- [x] Two-way comm tests
+- [x] RobotModel state update
+- [ ] Some way to notify collision between agents
+- [ ] Since we have timer update instead of action stepping, what is the notion of 'done'?
+- [ ] Integrate example test agents
+- [ ] NICE TO FIX: mismatch between ray casted scan and robot model

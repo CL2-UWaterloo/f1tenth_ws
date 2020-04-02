@@ -7,4 +7,10 @@ map_path: '/f1tenth_gym/maps/skirk.yaml'
 map_img_ext: '.png'
 executable_dir: '/f1tenth_gym/build/'
 
+
+
+
+# fixed vals DO NOT CHANGE
+scan_fov: 4.7
+scan_beams: 1080
 scan_distance_to_base_link: 0.275
