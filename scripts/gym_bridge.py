@@ -23,6 +23,8 @@ class GymBridge(object):
 
         self.ego_drive_topic = rospy.get_param('ego_drive_topic')
 
+        self.scan_distance_to_base_link = rospy.get_param('scan_distance_to_base_link')
+
         self.map_path = rospy.get_param('map_path')
         self.map_img_ext = rospy.get_param('map_img_ext')
         exec_dir = rospy.get_param('executable_dir')
@@ -45,10 +47,10 @@ class GymBridge(object):
         initial_state = {'x':[0.0, 2.0], 'y': [0.0, 0.0], 'theta': [0.0, 0.0]}
         self.obs, _, self.done, _ = self.racecar_env.reset(initial_state)
         self.ego_pose = [0., 0., 0.]
-        self.ego_vel = [0., 0., 0.]
+        self.ego_speed = [0., 0., 0.]
         self.ego_steer = 0.0
         self.opp_pose = [2., 0., 0.]
-        self.opp_vel = [0., 0., 0.]
+        self.opp_speed = [0., 0., 0.]
         self.opp_steer = 0.0
 
         # keep track of latest sim state
@@ -80,9 +82,20 @@ class GymBridge(object):
         obs, step_reward, done, info = self.racecar_env.step(action)
 
     def timer_callback(self, timer):
+        ts = rospy.Time.now()
+
         # pub scan
         scan = LaserScan()
+        scan.header.stamp = ts
+        scan.header.frame_id = 'ego_racecar/laser'
+        scan.ranges = self.ego_scan
         self.ego_scan_pub.publish(scan)
+
+        # pub tf
+        self.publish_odom(ts)
+        self.publish_transforms(ts)
+        self.publish_laser_transforms(ts)
+        self.publish_wheel_transforms(ts)
 
         # print('update')
 

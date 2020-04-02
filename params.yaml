@@ -6,3 +6,5 @@ ego_drive_topic: '/drive'
 map_path: '/f1tenth_gym/maps/skirk.yaml'
 map_img_ext: '.png'
 executable_dir: '/f1tenth_gym/build/'
+
+scan_distance_to_base_link: 0.275

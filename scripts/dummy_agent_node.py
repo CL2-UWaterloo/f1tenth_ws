@@ -10,7 +10,7 @@ class Agent(object):
         self.scan_sub = rospy.Subscriber('/scan', LaserScan, self.scan_callback, queue_size=1)
 
     def scan_callback(self, scan_msg):
-        print('got scan')
+        print('got scan, now plan')
         drive = AckermannDriveStamped()
         self.drive_pub.publish(drive)
 
