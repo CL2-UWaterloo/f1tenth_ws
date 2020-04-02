@@ -58,6 +58,9 @@ You should see an rviz window show up, showing the map, the two cars (ego is blu
 
 ...
 
+# Developing and creating your own agent in ROS
+A basic dummy agent node is provided in ```scripts/dummy_agent_node.py```. Launch your own node in your launch file, and don't forget to include ```gym_bridge_host.launch``` in your own launch file.
+
 # TODO
 - [x] Two-way comm tests
 - [x] RobotModel state update
