@@ -40,6 +40,7 @@ An example agent launch file is in ```launch/agent_template.launch```
 - [x] Two-way comm tests
 - [x] RobotModel state update
 - [ ] Some way to notify collision between agents
+- [ ] Some way to notify two cars finishing fixed number of laps
 - [ ] Since we have timer update instead of action stepping, what is the notion of 'done'?
-- [ ] Integrate example test agents
-- [ ] NICE TO FIX: mismatch between ray casted scan and robot model
+- [x] Integrate example test agents
+- [ ] Fix mismatch between ray casted scan and robot model
