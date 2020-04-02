@@ -20,8 +20,10 @@ RUN apt-get install -y libzmq3-dev \
 
 RUN cp -r /usr/include/eigen3/Eigen /usr/include
 
-RUN git clone https://github.com/google/protobuf.git && \
+RUN git clone https://github.com/protocolbuffers/protobuf.git && \
     cd protobuf && \
+    git checkout tags/v3.8.0 && \
+    git submodule update --init --recursive && \
     ./autogen.sh && \
     ./configure && \
     make -j8 && \
@@ -39,7 +41,7 @@ RUN pip install numpy==1.16.0 \
                 pyzmq \
                 Pillow \
                 gym \
-                protobuf \
+                protobuf==3.8.0 \
                 pyyaml 
 
 
