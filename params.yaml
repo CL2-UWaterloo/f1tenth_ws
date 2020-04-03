@@ -7,6 +7,8 @@ lap_count_topic: '/lap_count'
 lap_time_topic: '/lap_time'
 collision_topic: '/collision'
 
+race_info_topic: '/race_info'
+
 # fixed vals DO NOT CHANGE
 scan_fov: 4.7
 scan_beams: 1080

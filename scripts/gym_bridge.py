@@ -7,6 +7,9 @@ from geometry_msgs.msg import TransformStamped
 from geometry_msgs.msg import Transform
 from geometry_msgs.msg import Quaternion
 from ackermann_msgs.msg import AckermannDriveStamped
+
+from f1tenth_gym_ros.msg import RaceInfo
+
 from tf2_ros import transform_broadcaster
 from tf.transformations import quaternion_from_euler
 
@@ -21,8 +24,8 @@ class GymBridge(object):
         self.ego_scan_topic = rospy.get_param('ego_scan_topic')
         self.ego_odom_topic = rospy.get_param('ego_odom_topic')
         self.opp_odom_topic = rospy.get_param('opp_odom_topic')
-
         self.ego_drive_topic = rospy.get_param('ego_drive_topic')
+        self.race_info_topic = rospy.get_param('race_info_topic')
 
         self.scan_distance_to_base_link = rospy.get_param('scan_distance_to_base_link')
 
@@ -49,7 +52,7 @@ class GymBridge(object):
         # init gym backend
         self.racecar_env = gym.make('f110_gym:f110-v0')
         self.racecar_env.init_map(self.map_path, self.map_img_ext, False, False)
-        self.racecar_env.update_params(mu, h_cg, l_r, cs_f, cs_r, I_z, mass, exec_dir)
+        self.racecar_env.update_params(mu, h_cg, l_r, cs_f, cs_r, I_z, mass, exec_dir, double_finish=True)
 
         # init opponent agent
         # TODO: init by params.yaml
@@ -73,6 +76,7 @@ class GymBridge(object):
         self.ego_scan_pub = rospy.Publisher(self.ego_scan_topic, LaserScan, queue_size=1)
         self.ego_odom_pub = rospy.Publisher(self.ego_odom_topic, Odometry, queue_size=1)
         self.opp_odom_pub = rospy.Publisher(self.opp_odom_topic, Odometry, queue_size=1)
+        self.info_pub = rospy.Publisher(self.race_info_topic, RaceInfo, queue_size=1)
 
         # subs
         self.drive_sub = rospy.Subscriber(self.ego_drive_topic, AckermannDriveStamped, self.drive_callback, queue_size=1)
@@ -108,7 +112,6 @@ class GymBridge(object):
         self.obs, step_reward, self.done, info = self.racecar_env.step(action)
 
         self.update_sim_state()
-        print(self.obs['collisions'])
 
     def timer_callback(self, timer):
         ts = rospy.Time.now()
@@ -131,11 +134,19 @@ class GymBridge(object):
         self.publish_laser_transforms(ts)
         self.publish_wheel_transforms(ts)
 
-        # print('update')
+        # pub race info
+        self.publish_race_info(ts)
 
-    def publish_race_info(self):
-        # TODO: publish race information (lap counts, lap times, collisions)
-        pass
+    def publish_race_info(self, ts):
+        info = RaceInfo()
+        info.header.stamp = ts
+        info.ego_collision = self.obs['collisions'][0]
+        info.opp_collision = self.obs['collisions'][1]
+        info.ego_elapsed_time = self.obs['lap_times'][0]
+        info.opp_elapsed_time = self.obs['lap_times'][1]
+        info.ego_lap_count = self.obs['lap_counts'][0]
+        info.opp_lap_count = self.obs['lap_counts'][1]
+        self.info_pub.publish(info)
 
     def publish_odom(self, ts):
         ego_odom = Odometry()
