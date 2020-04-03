@@ -3,16 +3,17 @@ ego_odom_topic: '/odom'
 opp_odom_topic: '/opp_odom'
 ego_drive_topic: '/drive'
 
-map_path: '/f1tenth_gym/maps/skirk.yaml'
-map_img_ext: '.png'
-executable_dir: '/f1tenth_gym/build/'
-
-
-
+lap_count_topic: '/lap_count'
+lap_time_topic: '/lap_time'
+collision_topic: '/collision'
 
 # fixed vals DO NOT CHANGE
 scan_fov: 4.7
 scan_beams: 1080
 scan_distance_to_base_link: 0.275
+
+map_path: '/f1tenth_gym/maps/skirk.yaml'
+map_img_ext: '.png'
+executable_dir: '/f1tenth_gym/build/'
 
 waypoints_path: '/catkin_ws/src/f1tenth_gym_ros/maps/skirk.csv'

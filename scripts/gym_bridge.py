@@ -97,7 +97,6 @@ class GymBridge(object):
         self.opp_speed[1] = self.obs['linear_vels_y'][1]
         self.opp_speed[2] = self.obs['ang_vels_z'][1]
 
-
     def drive_callback(self, drive_msg):
         # print('in drive callback')
         # TODO: trigger opp agent plan, step env, update pose and steer and vel
@@ -133,6 +132,10 @@ class GymBridge(object):
         self.publish_wheel_transforms(ts)
 
         # print('update')
+
+    def publish_race_info(self):
+        # TODO: publish race information (lap counts, lap times, collisions)
+        pass
 
     def publish_odom(self, ts):
         ego_odom = Odometry()
