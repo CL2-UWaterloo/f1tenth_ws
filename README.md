@@ -3,6 +3,10 @@ This is a containerized ROS communication bridge for F1TENTH gym environment.
 
 This project is still under heavy developement.
 
+# Overview
+
+<img src="f1tenth_gym_ros.png" width="600">
+
 # Installation
 Before cloning this repo, you'll need to install Docker. Note that this environment is only tested on Ubuntu. You'll also need ROS on your host system.
 
@@ -64,10 +68,11 @@ A basic dummy agent node is provided in ```scripts/dummy_agent_node.py```. Launc
 # TODO
 - [x] Two-way comm tests
 - [x] RobotModel state update
-- [ ] Some way to notify collision between agents
-- [ ] Some way to notify two cars finishing fixed number of laps
-- [ ] Since we have timer update instead of action stepping, what is the notion of 'done'?
-- [ ] Publish more topics on collsions, laptime, and done
+- [x] Some way to notify collision between agents
+- [x] Some way to notify two cars finishing fixed number of laps
+- [x] Since we have timer update instead of action stepping, what is the notion of 'done'?
+- [x] Publish more topics on collsions, laptime, and done
 - [x] Integrate example test agents
 - [ ] Integrate competent racing agents (with random order when testing)
 - [x] Fix mismatch between ray casted scan and robot model
+- [ ] Add instruction in README for rebuilding image when remote repo updates
