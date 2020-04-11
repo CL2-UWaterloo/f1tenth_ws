@@ -34,7 +34,7 @@ $ rostopic list
 
 You should a see a few topics like the usual ```/rosout``` etc. And topics provided by the environment like ```/scan``` etc.
 
-When you're creating your own launch file to launch your node, please include ```gym_bridge_host.launch``` in the ```launch``` directory in your own launch file by putting this line in your launch file:
+**When you're creating your own launch file to launch your node, please include ```gym_bridge_host.launch``` in the ```launch``` directory in your own launch file by putting this line in your launch file:**
 
 ```xml
 <include file="$(find f1tenth_gym_ros)/launch/gym_bridge_host.launch"/>
@@ -48,7 +48,7 @@ After you build your workspace after ```catkin_make```, you can run the agent te
 $ roslaunch f1tenth_gym_ros agent_template.launch
 ```
 
-You should see an rviz window show up, showing the map, the two cars (ego is blud and opponent is orange), and the LaserScan of the ego car. The opponent is running pure pursuit around the track, and the ego agent is not moving.
+You should see an rviz window show up, showing the map, the two cars (ego is blue and opponent is orange), and the LaserScan of the ego car. The opponent is running pure pursuit around the track, and the ego agent is not moving.
 
 # Available Topics
 
@@ -60,7 +60,7 @@ You should see an rviz window show up, showing the map, the two cars (ego is blu
 
 ```/map```: The map of the environment
 
-```/race_info```: Information of the environment including both agents' elapsed runtimes, both agents' lap count, and both agents' collsion info.
+```/race_info```: Information of the environment including both agents' elapsed runtimes, both agents' lap count, and both agents' collsion info. **Currently, the race ends after both agents finish two laps, so the elapsed times will stop increasing after both lap counts are > 2**
 
 # Developing and creating your own agent in ROS
 A basic dummy agent node is provided in ```scripts/dummy_agent_node.py```. Launch your own node in your launch file, and don't forget to include ```gym_bridge_host.launch``` in your own launch file.
