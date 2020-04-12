@@ -77,3 +77,4 @@ A basic dummy agent node is provided in ```scripts/dummy_agent_node.py```. Launc
 - [x] Fix mismatch between ray casted scan and robot model
 - [ ] Add instruction in README for rebuilding image when remote repo updates
 - [ ] Handle env physics when collisions happen (agent-agent, agent-env)
+- [ ] Add some parameterization on racing scenarios
