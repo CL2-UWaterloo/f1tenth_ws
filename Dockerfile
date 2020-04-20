@@ -43,7 +43,8 @@ RUN pip install numpy==1.16.0 \
                 gym \
                 protobuf==3.8.0 \
                 pyyaml \
-                numba
+                llvmlite==0.31.0 \
+                numba==0.47.0
 
 
 RUN git clone https://github.com/f1tenth/f1tenth_gym
