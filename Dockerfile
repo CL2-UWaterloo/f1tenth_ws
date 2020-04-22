@@ -47,9 +47,11 @@ RUN pip install numpy==1.16.0 \
                 numba==0.47.0
 
 
-RUN git clone https://github.com/f1tenth/f1tenth_gym
+# RUN git clone https://github.com/f1tenth/f1tenth_gym
+RUN mkdir /f1tenth_gym
+COPY ./f1tenth_gym /f1tenth_gym
 
-RUn cd f1tenth_gym && \
+RUN cd f1tenth_gym && \
     mkdir build && \
     cd build && \
     cmake .. && \
