@@ -73,8 +73,8 @@ A basic dummy agent node is provided in ```scripts/dummy_agent_node.py```. Launc
 - [x] Since we have timer update instead of action stepping, what is the notion of 'done'?
 - [x] Publish more topics on collsions, laptime, and done
 - [x] Integrate example test agents
-- [ ] Integrate competent racing agents (with random order when testing)
+- [ ] ~~Integrate competent racing agents (with random order when testing)~~
 - [x] Fix mismatch between ray casted scan and robot model
-- [ ] Add instruction in README for rebuilding image when remote repo updates
+- [ ] ~~Add instruction in README for rebuilding image when remote repo updates~~
 - [ ] Handle env physics when collisions happen (agent-agent, agent-env)
 - [ ] Add some parameterization on racing scenarios
