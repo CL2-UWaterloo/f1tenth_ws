@@ -7,6 +7,11 @@ This project is still under heavy developement.
 
 <img src="f1tenth_gym_ros.png" width="600">
 
+# Different Benchmarks
+In our virtual race, there will be three benchmark tasks. **Benchmark 1** is a single agent time trial without obstacle on the track. The objective is to achieve lower lap times. **Benchmark 2** is a single agent task with unknown obstacles in the map before hand. The objective is to finish laps without crashing. **Benchmark 3** is a task where two agents compete simultaneously on the same track. The objective is to finish a certain number of laps before the other agent.
+
+We provide several branches for different benchmarks. On the **master** branch, the simulator is created for Benchmarks 1 & 2, where only a single agent (the ego agent) will spawn in the map. On the **multi-node** branch, the simulator is modified for Benchmark 3, where two agents will spawn in the map. We'll go over how these agents are controlled in a following section.
+
 # Installation
 Before cloning this repo, you'll need to install Docker. Note that this environment is only tested on Ubuntu. You'll also need ROS on your host system.
 
@@ -50,7 +55,7 @@ $ roslaunch f1tenth_gym_ros agent_template.launch
 
 You should see an rviz window show up, showing the map, the two cars (ego is blue and opponent is orange), and the LaserScan of the ego car. The opponent is running pure pursuit around the track, and the ego agent is not moving.
 
-# Available Topics
+# Available Topics for subscription
 
 ```/scan```: The ego agent's laser scan
 
@@ -58,12 +63,18 @@ You should see an rviz window show up, showing the map, the two cars (ego is blu
 
 ```/opp_odom```: The opponent agent's odometry
 
+```/opp_scan```: The opponent agent's laser scan (only available on the multi-node branch)
+
 ```/map```: The map of the environment
 
 ```/race_info```: Information of the environment including both agents' elapsed runtimes, both agents' lap count, and both agents' collsion info. **Currently, the race ends after both agents finish two laps, so the elapsed times will stop increasing after both lap counts are > 2**
 
 # Developing and creating your own agent in ROS
 A basic dummy agent node is provided in ```scripts/dummy_agent_node.py```. Launch your own node in your launch file, and don't forget to include ```gym_bridge_host.launch``` in your own launch file.
+
+On the **master** branch for single agent simulation, publish your drive message on the ```/drive``` topic using the AckermannDriveStamped message type. The simulation is stepped by a callback function subscribed to the drive topic.
+
+On the **multi-node** branch for two-agent simulation, publish the ego agent's drive commands to ```/drive```, and the opponent agent's drive commands to ```/opp_drive```. At this point, we're not providing any agents built in for testing. A good way to start test your algorithms in this setting is to use another algorithm that you've created, or even the same algorithm.
 
 # TODO
 - [x] Two-way comm tests
@@ -77,4 +88,4 @@ A basic dummy agent node is provided in ```scripts/dummy_agent_node.py```. Launc
 - [x] Fix mismatch between ray casted scan and robot model
 - [ ] ~~Add instruction in README for rebuilding image when remote repo updates~~
 - [ ] Handle env physics when collisions happen (agent-agent, agent-env)
-- [ ] Add some parameterization on racing scenarios
+- [ ] ~~Add some parameterization on racing scenarios~~
