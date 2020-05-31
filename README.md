@@ -10,7 +10,7 @@ This project is still under heavy developement.
 # Different Benchmarks
 In our virtual race, there will be three benchmark tasks. **Benchmark 1** is a single agent time trial without obstacle on the track. The objective is to achieve lower lap times. **Benchmark 2** is a single agent task with unknown obstacles in the map before hand. The objective is to finish laps without crashing. **Benchmark 3** is a task where two agents compete simultaneously on the same track. The objective is to finish a certain number of laps before the other agent.
 
-We provide several branches for different benchmarks. On the **master** branch, the simulator is created for Benchmarks 1 & 2, where only a single agent (the ego agent) will spawn in the map. On the **multi-node** branch, the simulator is modified for Benchmark 3, where two agents will spawn in the map. We'll go over how these agents are controlled in a following section.
+We provide several branches for different benchmarks. On the **master** branch, the simulator is created for Benchmarks 1 & 2, where only a single agent (the ego agent) will spawn in the map. On the **multi_node** branch, the simulator is modified for Benchmark 3, where two agents will spawn in the map. We'll go over how these agents are controlled in a following section.
 
 # Installation
 Before cloning this repo, you'll need to install Docker. Note that this environment is only tested on Ubuntu. You'll also need ROS on your host system.
@@ -63,7 +63,7 @@ You should see an rviz window show up, showing the map, the two cars (ego is blu
 
 ```/opp_odom```: The opponent agent's odometry
 
-```/opp_scan```: The opponent agent's laser scan (only available on the multi-node branch)
+```/opp_scan```: The opponent agent's laser scan (only available on the multi_node branch)
 
 ```/map```: The map of the environment
 
@@ -74,7 +74,7 @@ A basic dummy agent node is provided in ```scripts/dummy_agent_node.py```. Launc
 
 On the **master** branch for single agent simulation, publish your drive message on the ```/drive``` topic using the AckermannDriveStamped message type. The simulation is stepped by a callback function subscribed to the drive topic.
 
-On the **multi-node** branch for two-agent simulation, publish the ego agent's drive commands to ```/drive```, and the opponent agent's drive commands to ```/opp_drive```. At this point, we're not providing any agents built in for testing. A good way to start test your algorithms in this setting is to use another algorithm that you've created, or even the same algorithm.
+On the **multi_node** branch for two-agent simulation, publish the ego agent's drive commands to ```/drive```, and the opponent agent's drive commands to ```/opp_drive```. At this point, we're not providing any agents built in for testing. A good way to start test your algorithms in this setting is to use another algorithm that you've created, or even the same algorithm.
 
 # TODO
 - [x] Two-way comm tests
