@@ -20,8 +20,8 @@ We provide several branches for different benchmarks. On the **master** branch, 
 <!---Before cloning this repo, you'll need to install Docker. Note that this environment is only tested on Ubuntu. You'll also need ROS on your host system. --->
 
 **System Requirements:**
-- Ubuntu
-- ROS
+- Ubuntu (tested on 18.04)
+- ROS (tested on Melodic)
 - Docker (Follow the instructions [here](https://docs.docker.com/install/linux/docker-ce/ubuntu/) to install Docker. A short tutorial can be found [here](https://docs.docker.com/get-started/) if you're not familiar with Docker.)
 
 1. Clone this repo into the ```src/``` directory in your workspace, 
