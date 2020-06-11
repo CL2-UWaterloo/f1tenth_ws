@@ -74,6 +74,13 @@ On the **master** branch for single agent simulation, publish your drive message
 
 On the **multi_node** branch for two-agent simulation, publish the ego agent's drive commands to ```/drive```, and the opponent agent's drive commands to ```/opp_drive```. At this point, we're not providing any agents built in for testing. A good way to start test your algorithms in this setting is to use another algorithm that you've created, or even the same algorithm.
 
+# Changing maps
+After you've ran the ```build_docker.sh``` script, you can copy the corresponding .yaml and image file into two directories: ```f1tenth_gym_ros/maps``` and ```f1tenth_gym_ros/f1tenth_gym/maps```. Then change the ```map_path``` and ```map_img_ext``` parameters in ```f1tenth_gym_ros/params.yaml``` to the corresponding paths. Lastly, change the ```map``` argument in ```f1tenth_gym_ros/launch/gym_bridge.launch``` to the new map.
+
+After making all the changes, make sure you run ```build_docker.sh``` to rebuild the container.
+
+You can find a collection of maps including the ones from past competitions here: https://github.com/f1tenth/f1tenth_simulator/tree/master/maps
+
 # TODO
 - [x] Two-way comm tests
 - [x] RobotModel state update
