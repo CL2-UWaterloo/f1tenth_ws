@@ -10,6 +10,7 @@
 
   <!-- Launch gym bridge node -->
   <rosparam command="load" file="$(find f1tenth_gym_ros)/params.yaml"/>
+  <param name="map_path" value="$(arg map)"/>
   <node pkg="f1tenth_gym_ros" name="gym_bridge" type="gym_bridge.py" output="screen"/>
 
 </launch>
