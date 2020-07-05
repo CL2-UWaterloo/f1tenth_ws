@@ -2,7 +2,7 @@
 <launch>
   
   <!-- Launch a map from the maps folder-->
-  <arg name="map" default="$(find f1tenth_gym_ros)/maps/skirk.yaml"/>
+  <arg name="map" default="$(find f1tenth_gym_ros)/maps/berlin.yaml"/>
   <node pkg="map_server" name="map_server" type="map_server" args="$(arg map)"/>
 
   <!-- Launch robot model -->
