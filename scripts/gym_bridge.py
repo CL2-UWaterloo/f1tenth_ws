@@ -31,6 +31,7 @@ class GymBridge(object):
 
         self.map_path = rospy.get_param('map_path')
         self.map_img_ext = rospy.get_param('map_img_ext')
+        print(self.map_path, self.map_img_ext)
         exec_dir = rospy.get_param('executable_dir')
 
         scan_fov = rospy.get_param('scan_fov')
