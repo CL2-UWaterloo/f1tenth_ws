@@ -43,7 +43,7 @@ class GymBridge(object):
         csv_path = rospy.get_param('waypoints_path')
         
         wheelbase = 0.3302
-        mass= 3.74
+        mass= 3.47
         l_r = 0.17145
         I_z = 0.04712
         mu = 0.523
