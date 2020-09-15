@@ -15,7 +15,8 @@ RUN apt-get install -y libzmq3-dev \
                        cmake \
                        vim \
                        ros-melodic-ackermann-msgs \
-                       ros-melodic-map-server
+                       ros-melodic-map-server \
+                       ros-melodic-genpy
 
 
 RUN cp -r /usr/include/eigen3/Eigen /usr/include
