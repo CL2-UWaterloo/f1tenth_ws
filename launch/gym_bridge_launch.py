@@ -20,38 +20,33 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-FROM osrf/ros:foxy-desktop
+from launch import LaunchDescription
+from launch_ros.actions import Node
 
-SHELL ["/bin/bash", "-c"]
-
-# dependencies
-RUN apt-get update --fix-missing && \
-    apt-get install -y git \
-                       nano \
-                       vim \
-                       python3-pip
-
-RUN pip3 install --upgrade pip
-RUN pip3 install numpy \
-                 scipy \
-                 Pillow \
-                 gym \
-                 pyyaml \
-                 llvmlite \
-                 numba \
-                 pyglet
-
-# f1tenth gym
-RUN git clone https://github.com/f1tenth/f1tenth_gym
-RUN cd f1tenth_gym && \
-    pip3 install -e gym/
-
-# ros2 gym bridge
-RUN mkdir -p sim_ws/src/f1tenth_gym_ros
-COPY . /sim_ws/src/f1tenth_gym_ros
-RUN source /opt/ros/foxy/setup.bash && \
-    cd sim_ws/ && \
-    rosdep install -i --from-path src --rosdistro foxy -y && \
-    colcon build
-
-ENTRYPOINT ["/bin/bash"]
+def generate_launch_description():
+    return LaunchDescription([
+        Node(
+            package='f1tenth_gym_ros',
+            executable='gym_bridge',
+            name='bridge',
+            parameters=[{
+                'ego_scan_topic': 'scan',
+                'ego_odom_topic': 'odom',
+                'ego_drive_topic': 'drive',
+                'opp_scan_topic': 'opp_scan',
+                'opp_odom_topic': 'opp_odom',
+                'opp_drive_topic': 'opp_drive',
+                'scan_distance_to_base_link': 0.275,
+                'scan_fov': 4.7,
+                'scan_beams': 1080,
+                'map_path': '/f1tenth_gym/maps/berlin.yaml',
+                'map_img_ext': '.png',
+                'num_agent': 1
+            }]
+        ),
+        Node(
+            package='rviz2',
+            executable='rviz2',
+            name='rviz'
+        )
+    ])
