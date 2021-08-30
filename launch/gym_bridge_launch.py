@@ -22,27 +22,21 @@
 
 from launch import LaunchDescription
 from launch_ros.actions import Node
+from ament_index_python.packages import get_package_share_directory
+import os
 
 def generate_launch_description():
+    config = os.path.join(
+        get_package_share_directory('f1tenth_gym_ros'),
+        'config',
+        'sim.yaml'
+        )
     return LaunchDescription([
         Node(
             package='f1tenth_gym_ros',
             executable='gym_bridge',
             name='bridge',
-            parameters=[{
-                'ego_scan_topic': 'scan',
-                'ego_odom_topic': 'odom',
-                'ego_drive_topic': 'drive',
-                'opp_scan_topic': 'opp_scan',
-                'opp_odom_topic': 'opp_odom',
-                'opp_drive_topic': 'opp_drive',
-                'scan_distance_to_base_link': 0.275,
-                'scan_fov': 4.7,
-                'scan_beams': 1080,
-                'map_path': '/f1tenth_gym/maps/berlin.yaml',
-                'map_img_ext': '.png',
-                'num_agent': 1
-            }]
+            parameters=[config]
         ),
         Node(
             package='rviz2',

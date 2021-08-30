@@ -20,39 +20,40 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-FROM osrf/ros:foxy-desktop
+bridge:
+  ros__parameters:
+    # topics and namespaces
+    ego_namespace: 'ego_racecar'
+    ego_scan_topic: 'scan'
+    ego_odom_topic: 'odom'
+    ego_opp_odom_topic: 'opp_odom'
+    ego_drive_topic: 'drive'
+    opp_namespace: 'opp_racecar'
+    opp_scan_topic: 'opp_scan'
+    opp_odom_topic: 'odom'
+    opp_ego_odom_topic: 'opp_odom'
+    opp_drive_topic: 'opp_drive'
 
-SHELL ["/bin/bash", "-c"]
+    # transform related
+    scan_distance_to_base_link: 0.275
+    
+    # laserscan parameters
+    scan_fov: 4.7
+    scan_beams: 1080
 
-# dependencies
-RUN apt-get update --fix-missing && \
-    apt-get install -y git \
-                       nano \
-                       vim \
-                       python3-pip
+    # map parameters
+    map_path: '/f1tenth_gym/gym/f110_gym/envs/maps/berlin'
+    map_img_ext: '.png'
 
-RUN pip3 install --upgrade pip
-RUN pip3 install numpy \
-                 scipy \
-                 Pillow \
-                 gym \
-                 pyyaml \
-                 llvmlite \
-                 numba \
-                 pyglet \
-                 transforms3d
+    # opponent parameters
+    num_agent: 1
 
-# f1tenth gym
-RUN git clone https://github.com/f1tenth/f1tenth_gym
-RUN cd f1tenth_gym && \
-    pip3 install -e gym/
+    # ego starting pose on map
+    sx: 0.0
+    sy: 0.0
+    stheta: 1.47
 
-# ros2 gym bridge
-RUN mkdir -p sim_ws/src/f1tenth_gym_ros
-COPY . /sim_ws/src/f1tenth_gym_ros
-RUN source /opt/ros/foxy/setup.bash && \
-    cd sim_ws/ && \
-    rosdep install -i --from-path src --rosdistro foxy -y && \
-    colcon build
-
-ENTRYPOINT ["/bin/bash"]
+    # opp starting pose on map
+    sx1: 2.0
+    sy1: 0.0
+    stheta1: 1.47
