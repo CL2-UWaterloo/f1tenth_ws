@@ -169,9 +169,9 @@ class GymBridge(Node):
 
     def drive_timer_callback(self):
         if self.ego_drive_published and not self.has_opp:
-            self.obs, _, self.done, _ = self.env.step(np.array([[self.ego_steer, self.ego_speed]]))
+            self.obs, _, self.done, _ = self.env.step(np.array([[self.ego_steer, self.ego_requested_speed]]))
         elif self.ego_drive_published and self.has_opp and self.opp_drive_published:
-            self.obs, _, self.done, _ = self.env.step(np.array([[self.ego_steer, self.ego_speed], [self.opp_steer, self.opp_speed]]))
+            self.obs, _, self.done, _ = self.env.step(np.array([[self.ego_steer, self.ego_requested_speed], [self.opp_steer, self.opp_requested_speed]]))
         self._update_sim_state()
 
     def timer_callback(self):
@@ -232,15 +232,15 @@ class GymBridge(Node):
     def _publish_odom(self, ts):
         ego_odom = Odometry()
         ego_odom.header.stamp = ts
-        ego_odom.header.frame_id = '/map'
-        ego_odom.child_frame_id = 'ego_racecar/base_link'
+        ego_odom.header.frame_id = 'map'
+        ego_odom.child_frame_id = self.ego_namespace + '/base_link'
         ego_odom.pose.pose.position.x = self.ego_pose[0]
         ego_odom.pose.pose.position.y = self.ego_pose[1]
-        ego_quat = euler.euler2quat(0., 0., self.ego_pose[2])
-        ego_odom.pose.pose.orientation.x = ego_quat[0]
-        ego_odom.pose.pose.orientation.y = ego_quat[1]
-        ego_odom.pose.pose.orientation.z = ego_quat[2]
-        ego_odom.pose.pose.orientation.w = ego_quat[3]
+        ego_quat = euler.euler2quat(0., 0., self.ego_pose[2], axes='sxyz')
+        ego_odom.pose.pose.orientation.x = ego_quat[1]
+        ego_odom.pose.pose.orientation.y = ego_quat[2]
+        ego_odom.pose.pose.orientation.z = ego_quat[3]
+        ego_odom.pose.pose.orientation.w = ego_quat[0]
         ego_odom.twist.twist.linear.x = self.ego_speed[0]
         ego_odom.twist.twist.linear.y = self.ego_speed[1]
         ego_odom.twist.twist.angular.z = self.ego_speed[2]
@@ -249,15 +249,15 @@ class GymBridge(Node):
         if self.has_opp:
             opp_odom = Odometry()
             opp_odom.header.stamp = ts
-            opp_odom.header.frame_id = '/map'
-            opp_odom.child_frame_id = 'opp_racecar/base_link'
+            opp_odom.header.frame_id = 'map'
+            opp_odom.child_frame_id = self.opp_namespace + '/base_link'
             opp_odom.pose.pose.position.x = self.opp_pose[0]
             opp_odom.pose.pose.position.y = self.opp_pose[1]
-            opp_quat = euler.euler2quat(0., 0., self.opp_pose[2])
-            opp_odom.pose.pose.orientation.x = opp_quat[0]
-            opp_odom.pose.pose.orientation.y = opp_quat[1]
-            opp_odom.pose.pose.orientation.z = opp_quat[2]
-            opp_odom.pose.pose.orientation.w = opp_quat[3]
+            opp_quat = euler.euler2quat(0., 0., self.opp_pose[2], axes='sxyz')
+            opp_odom.pose.pose.orientation.x = opp_quat[1]
+            opp_odom.pose.pose.orientation.y = opp_quat[2]
+            opp_odom.pose.pose.orientation.z = opp_quat[3]
+            opp_odom.pose.pose.orientation.w = opp_quat[0]
             opp_odom.twist.twist.linear.x = self.opp_speed[0]
             opp_odom.twist.twist.linear.y = self.opp_speed[1]
             opp_odom.twist.twist.angular.z = self.opp_speed[2]
@@ -270,16 +270,16 @@ class GymBridge(Node):
         ego_t.translation.x = self.ego_pose[0]
         ego_t.translation.y = self.ego_pose[1]
         ego_t.translation.z = 0.0
-        ego_quat = euler.euler2quat(0.0, 0.0, self.ego_pose[2])
-        ego_t.rotation.x = ego_quat[0]
-        ego_t.rotation.y = ego_quat[1]
-        ego_t.rotation.z = ego_quat[2]
-        ego_t.rotation.w = ego_quat[3]
+        ego_quat = euler.euler2quat(0.0, 0.0, self.ego_pose[2], axes='sxyz')
+        ego_t.rotation.x = ego_quat[1]
+        ego_t.rotation.y = ego_quat[2]
+        ego_t.rotation.z = ego_quat[3]
+        ego_t.rotation.w = ego_quat[0]
 
         ego_ts = TransformStamped()
         ego_ts.transform = ego_t
         ego_ts.header.stamp = ts
-        ego_ts.header.frame_id = '/map'
+        ego_ts.header.frame_id = 'map'
         ego_ts.child_frame_id = self.ego_namespace + '/base_link'
         self.br.sendTransform(ego_ts)
 
@@ -288,26 +288,26 @@ class GymBridge(Node):
             opp_t.translation.x = self.opp_pose[0]
             opp_t.translation.y = self.opp_pose[1]
             opp_t.translation.z = 0.0
-            opp_quat = euler.euler2quat(0.0, 0.0, self.opp_pose[2])
-            opp_t.rotation.x = opp_quat[0]
-            opp_t.rotation.y = opp_quat[1]
-            opp_t.rotation.z = opp_quat[2]
-            opp_t.rotation.w = opp_quat[3]
+            opp_quat = euler.euler2quat(0.0, 0.0, self.opp_pose[2], axes='sxyz')
+            opp_t.rotation.x = opp_quat[1]
+            opp_t.rotation.y = opp_quat[2]
+            opp_t.rotation.z = opp_quat[3]
+            opp_t.rotation.w = opp_quat[0]
 
             opp_ts = TransformStamped()
             opp_ts.transform = opp_t
             opp_ts.header.stamp = ts
-            opp_ts.header.frame_id = '/map'
+            opp_ts.header.frame_id = 'map'
             opp_ts.child_frame_id = self.opp_namespace + '/base_link'
             self.br.sendTransform(opp_ts)
 
     def _publish_wheel_transforms(self, ts):
         ego_wheel_ts = TransformStamped()
-        ego_wheel_quat = euler.euler2quat(0., 0., self.ego_steer)
-        ego_wheel_ts.transform.rotation.x = ego_wheel_quat[0]
-        ego_wheel_ts.transform.rotation.y = ego_wheel_quat[1]
-        ego_wheel_ts.transform.rotation.z = ego_wheel_quat[2]
-        ego_wheel_ts.transform.rotation.w = ego_wheel_quat[3]
+        ego_wheel_quat = euler.euler2quat(0., 0., self.ego_steer, axes='sxyz')
+        ego_wheel_ts.transform.rotation.x = ego_wheel_quat[1]
+        ego_wheel_ts.transform.rotation.y = ego_wheel_quat[2]
+        ego_wheel_ts.transform.rotation.z = ego_wheel_quat[3]
+        ego_wheel_ts.transform.rotation.w = ego_wheel_quat[0]
         ego_wheel_ts.header.stamp = ts
         ego_wheel_ts.header.frame_id = self.ego_namespace + '/front_left_hinge'
         ego_wheel_ts.child_frame_id = self.ego_namespace + '/front_left_wheel'
@@ -318,11 +318,11 @@ class GymBridge(Node):
 
         if self.has_opp:
             opp_wheel_ts = TransformStamped()
-            opp_wheel_quat = euler.euler2quat(0., 0., self.opp_steer)
-            opp_wheel_ts.transform.rotation.x = opp_wheel_quat[0]
-            opp_wheel_ts.transform.rotation.y = opp_wheel_quat[1]
-            opp_wheel_ts.transform.rotation.z = opp_wheel_quat[2]
-            opp_wheel_ts.transform.rotation.w = opp_wheel_quat[3]
+            opp_wheel_quat = euler.euler2quat(0., 0., self.opp_steer, axes='sxyz')
+            opp_wheel_ts.transform.rotation.x = opp_wheel_quat[1]
+            opp_wheel_ts.transform.rotation.y = opp_wheel_quat[2]
+            opp_wheel_ts.transform.rotation.z = opp_wheel_quat[3]
+            opp_wheel_ts.transform.rotation.w = opp_wheel_quat[0]
             opp_wheel_ts.header.stamp = ts
             opp_wheel_ts.header.frame_id = self.opp_namespace + '/front_left_hinge'
             opp_wheel_ts.child_frame_id = self.opp_namespace + '/front_left_wheel'
@@ -334,6 +334,7 @@ class GymBridge(Node):
     def _publish_laser_transforms(self, ts):
         ego_scan_ts = TransformStamped()
         ego_scan_ts.transform.translation.x = self.scan_distance_to_base_link
+        # ego_scan_ts.transform.translation.z = 0.04+0.1+0.025
         ego_scan_ts.transform.rotation.w = 1.
         ego_scan_ts.header.stamp = ts
         ego_scan_ts.header.frame_id = self.ego_namespace + '/base_link'

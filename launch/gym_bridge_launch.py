@@ -22,8 +22,10 @@
 
 from launch import LaunchDescription
 from launch_ros.actions import Node
+from launch.substitutions import Command
 from ament_index_python.packages import get_package_share_directory
 import os
+import yaml
 
 def generate_launch_description():
     config = os.path.join(
@@ -31,16 +33,68 @@ def generate_launch_description():
         'config',
         'sim.yaml'
         )
-    return LaunchDescription([
-        Node(
-            package='f1tenth_gym_ros',
-            executable='gym_bridge',
-            name='bridge',
-            parameters=[config]
-        ),
-        Node(
-            package='rviz2',
-            executable='rviz2',
-            name='rviz'
-        )
-    ])
+    config_dict = yaml.safe_load(open(config, 'r'))
+    has_opp = config_dict['bridge']['ros__parameters']['num_agent'] > 1
+
+    bridge_node = Node(
+        package='f1tenth_gym_ros',
+        executable='gym_bridge',
+        name='bridge',
+        parameters=[config]
+    )
+    rviz_node = Node(
+        package='rviz2',
+        executable='rviz2',
+        name='rviz',
+        # arguments=['-d ' + os.path.join(get_package_share_directory('f1tenth_gym_ros'), 'launch', 'gym_bridge.rviz')]
+    )
+    map_server_node = Node(
+        package='nav2_map_server',
+        executable='map_server',
+        parameters=[{'yaml_filename': config_dict['bridge']['ros__parameters']['map_path'] + '.yaml'},
+                    {'topic': 'map'},
+                    {'frame_id': 'map'},
+                    {'output': 'screen'},
+                    {'use_sim_time': True}]
+    )
+    nav_lifecycle_node = Node(
+        package='nav2_lifecycle_manager',
+        executable='lifecycle_manager',
+        name='lifecycle_manager_localization',
+        output='screen',
+        parameters=[{'use_sim_time': True},
+                    {'autostart': True},
+                    {'node_names': ['map_server']}]
+    )
+    ego_robot_publisher = Node(
+        package='robot_state_publisher',
+        executable='robot_state_publisher',
+        name='ego_robot_state_publisher',
+        parameters=[{'robot_description': Command(['xacro ', os.path.join(get_package_share_directory('f1tenth_gym_ros'), 'launch', 'ego_racecar.xacro')])},
+                    {'tf_prefix': config_dict['bridge']['ros__parameters']['ego_namespace']}]
+    )
+    opp_robot_publisher = Node(
+        package='robot_state_publisher',
+        executable='robot_state_publisher',
+        name='opp_robot_state_publisher',
+        parameters=[{'robot_description': Command(['xacro ', os.path.join(get_package_share_directory('f1tenth_gym_ros'), 'launch', 'opp_racecar.xacro')])},
+                    {'tf_prefix': config_dict['bridge']['ros__parameters']['opp_namespace']}]
+    )
+
+    if has_opp:
+        return LaunchDescription([
+            rviz_node,
+            bridge_node,
+            nav_lifecycle_node,
+            map_server_node,
+            ego_robot_publisher,
+            opp_robot_publisher,
+        ])
+    else:
+        return LaunchDescription([
+            rviz_node,
+            bridge_node,
+            nav_lifecycle_node,
+            map_server_node,
+            ego_robot_publisher,
+        ])
