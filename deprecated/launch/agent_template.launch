@@ -1,9 +1,0 @@
-<?xml version="1.0"?>
-<launch>
-  
-<include file="$(find f1tenth_gym_ros)/launch/gym_bridge_host.launch"/>
-
-<node pkg="f1tenth_gym_ros" type="dummy_agent_node.py" name="dummy_agent" output="screen"/>
-
-
-  </launch>

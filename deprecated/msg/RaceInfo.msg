@@ -1,7 +1,0 @@
-Header header
-float32 ego_lap_count
-float32 opp_lap_count
-float32 ego_elapsed_time
-float32 opp_elapsed_time
-bool ego_collision
-bool opp_collision
