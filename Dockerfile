@@ -29,7 +29,8 @@ RUN apt-get update --fix-missing && \
     apt-get install -y git \
                        nano \
                        vim \
-                       python3-pip
+                       python3-pip \
+                       tmux
 
 RUN pip3 install --upgrade pip
 RUN pip3 install numpy \

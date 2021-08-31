@@ -26,6 +26,8 @@ from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseWithCovarianceStamped
+from geometry_msgs.msg import Twist
 from geometry_msgs.msg import TransformStamped
 from geometry_msgs.msg import Transform
 from geometry_msgs.msg import Quaternion
@@ -62,6 +64,7 @@ class GymBridge(Node):
         self.declare_parameter('sx1')
         self.declare_parameter('sy1')
         self.declare_parameter('stheta1')
+        self.declare_parameter('kb_teleop')
 
         # check num_agents
         num_agents = self.get_parameter('num_agent').value
@@ -146,12 +149,30 @@ class GymBridge(Node):
             ego_drive_topic,
             self.drive_callback,
             10)
+        self.ego_reset_sub = self.create_subscription(
+            PoseWithCovarianceStamped,
+            '/initialpose',
+            self.ego_reset_callback,
+            10)
         if num_agents == 2:
             self.opp_drive_sub = self.create_subscription(
                 AckermannDriveStamped,
                 opp_drive_topic,
                 self.opp_drive_callback,
                 10)
+            self.opp_reset_sub = self.create_subscription(
+                PoseStamped,
+                '/goal_pose',
+                self.opp_reset_callback,
+                10)
+
+        if self.get_parameter('kb_teleop').value:
+            self.teleop_sub = self.create_subscription(
+                Twist,
+                '/cmd_vel',
+                self.teleop_callback,
+                10)
+
 
     def drive_callback(self, drive_msg):
         self.ego_requested_speed = drive_msg.drive.speed
@@ -163,8 +184,38 @@ class GymBridge(Node):
         self.opp_steer = drive_msg.drive.steering_angle
         self.opp_drive_published = True
 
-    def pose_callback(self, pose_msg):
-        pass
+    def ego_reset_callback(self, pose_msg):
+        rx = pose_msg.pose.pose.position.x
+        ry = pose_msg.pose.pose.position.y
+        rqx = pose_msg.pose.pose.orientation.x
+        rqy = pose_msg.pose.pose.orientation.y
+        rqz = pose_msg.pose.pose.orientation.z
+        rqw = pose_msg.pose.pose.orientation.w
+        _, _, rtheta = euler.quat2euler([rqw, rqx, rqy, rqz], axes='sxyz')
+        self.obs, _ , self.done, _ = self.env.reset(np.array([[rx, ry, rtheta]]))
+
+    def opp_reset_callback(self, pose_msg):
+        if self.has_opp:
+            rx = pose_msg.pose.position.x
+            ry = pose_msg.pose.position.y
+            rqx = pose_msg.pose.orientation.x
+            rqy = pose_msg.pose.orientation.y
+            rqz = pose_msg.pose.orientation.z
+            rqw = pose_msg.pose.orientation.w
+            _, _, rtheta = euler.quat2euler([rqw, rqx, rqy, rqz], axes='sxyz')
+            self.obs, _ , self.done, _ = self.env.reset(np.array([list(self.ego_pose), [rx, ry, rtheta]]))
+    def teleop_callback(self, twist_msg):
+        if not self.ego_drive_published:
+            self.ego_drive_published = True
+        if twist_msg.linear.x != 0.0:
+            self.ego_requested_speed = twist_msg.linear.x
+            self.ego_steer = 0.0
+            return
+        if twist_msg.angular.z > 0.0:
+            self.ego_steer = 0.3
+            return
+        elif twist_msg.angular.z < 0.0:
+            self.ego_steer = -0.3
 
     def drive_timer_callback(self):
         if self.ego_drive_published and not self.has_opp:

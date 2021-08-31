@@ -28,6 +28,7 @@ import os
 import yaml
 
 def generate_launch_description():
+    ld = LaunchDescription()
     config = os.path.join(
         get_package_share_directory('f1tenth_gym_ros'),
         'config',
@@ -35,6 +36,7 @@ def generate_launch_description():
         )
     config_dict = yaml.safe_load(open(config, 'r'))
     has_opp = config_dict['bridge']['ros__parameters']['num_agent'] > 1
+    teleop = config_dict['bridge']['ros__parameters']['kb_teleop']
 
     bridge_node = Node(
         package='f1tenth_gym_ros',
@@ -46,7 +48,7 @@ def generate_launch_description():
         package='rviz2',
         executable='rviz2',
         name='rviz',
-        # arguments=['-d ' + os.path.join(get_package_share_directory('f1tenth_gym_ros'), 'launch', 'gym_bridge.rviz')]
+        arguments=['-d', os.path.join(get_package_share_directory('f1tenth_gym_ros'), 'launch', 'gym_bridge.rviz')]
     )
     map_server_node = Node(
         package='nav2_map_server',
@@ -81,20 +83,13 @@ def generate_launch_description():
         remappings=[('/robot_description', 'opp_robot_description')]
     )
 
+    # finalize
+    ld.add_action(rviz_node)
+    ld.add_action(bridge_node)
+    ld.add_action(nav_lifecycle_node)
+    ld.add_action(map_server_node)
+    ld.add_action(ego_robot_publisher)
     if has_opp:
-        return LaunchDescription([
-            rviz_node,
-            bridge_node,
-            nav_lifecycle_node,
-            map_server_node,
-            ego_robot_publisher,
-            opp_robot_publisher,
-        ])
-    else:
-        return LaunchDescription([
-            rviz_node,
-            bridge_node,
-            nav_lifecycle_node,
-            map_server_node,
-            ego_robot_publisher,
-        ])
+        ld.add_action(opp_robot_publisher)
+
+    return ld
