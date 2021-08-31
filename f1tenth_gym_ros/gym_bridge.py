@@ -85,7 +85,6 @@ class GymBridge(Node):
         self.ego_steer = 0.0
         self.ego_collision = False
         ego_scan_topic = self.get_parameter('ego_scan_topic').value
-        ego_odom_topic = self.get_parameter('ego_odom_topic').value
         ego_drive_topic = self.get_parameter('ego_drive_topic').value
         scan_fov = self.get_parameter('scan_fov').value
         scan_beams = self.get_parameter('scan_beams').value
@@ -93,10 +92,12 @@ class GymBridge(Node):
         self.angle_max = scan_fov / 2.
         self.angle_inc = scan_fov / scan_beams
         self.ego_namespace = self.get_parameter('ego_namespace').value
+        ego_odom_topic = self.ego_namespace + '/' + self.get_parameter('ego_odom_topic').value
         self.scan_distance_to_base_link = self.get_parameter('scan_distance_to_base_link').value
         
         if num_agents == 2:
             self.has_opp = True
+            self.opp_namespace = self.get_parameter('opp_namespace').value
             sx1 = self.get_parameter('sx1').value
             sy1 = self.get_parameter('sy1').value
             stheta1 = self.get_parameter('stheta1').value
@@ -110,13 +111,11 @@ class GymBridge(Node):
             self.opp_scan = list(self.obs['scans'][1])
 
             opp_scan_topic = self.get_parameter('opp_scan_topic').value
-            opp_odom_topic = self.get_parameter('opp_odom_topic').value
+            opp_odom_topic = self.opp_namespace + '/' + self.get_parameter('opp_odom_topic').value
             opp_drive_topic = self.get_parameter('opp_drive_topic').value
 
-            ego_opp_odom_topic = self.get_parameter('ego_opp_odom_topic').value
-            opp_ego_odom_topic = self.get_parameter('opp_ego_odom_topic').value
-
-            self.opp_namespace = self.get_parameter('opp_namespace').value
+            ego_opp_odom_topic = self.ego_namespace + '/' + self.get_parameter('ego_opp_odom_topic').value
+            opp_ego_odom_topic = self.opp_namespace + '/' + self.get_parameter('opp_ego_odom_topic').value
         else:
             self.has_opp = False
             self.obs, _ , self.done, _ = self.env.reset(np.array([[sx, sy, stheta]]))
