@@ -20,7 +20,7 @@ We provide several branches for different benchmarks. On the **master** branch, 
 **Supported System:**
 
 - Ubuntu (tested on 20.04) with an NVIDIA gpu and nvidia-docker2 support
-- We'll expand support to other systems soon
+- Windows 10 and macOS with noVNC
 
 **Dependencies (with an nvidia gpu):**
 
