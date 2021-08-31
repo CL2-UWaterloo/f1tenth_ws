@@ -54,6 +54,6 @@ bridge:
     stheta: 0.0
 
     # opp starting pose on map
-    sx1: 0.0
-    sy1: 0.0
+    sx1: 2.0
+    sy1: 0.5
     stheta1: 0.0
