@@ -1,43 +1,27 @@
 # F1TENTH gym environment ROS2 communication bridge
 This is a containerized ROS communication bridge for the F1TENTH gym environment that turns it into a simulation in ROS2.
 
-<!-- # Overview -->
-
-<!-- <img src="f1tenth_gym_ros.png" width="600"> -->
-
-<!-- # Different Benchmarks
-In our virtual race, there will be three benchmark tasks. 
-
-1. **Benchmark 1** is a single agent time trial without obstacle on the track. The objective is to achieve lower lap times. 
-2. **Benchmark 2** is a single agent task with unknown obstacles in the map before hand. The objective is to finish laps without crashing. 
-3. **Benchmark 3** is a task where two agents compete simultaneously on the same track. The objective is to finish a certain number of laps before the other agent.
-
-We provide several branches for different benchmarks. On the **master** branch, the simulator is created for Benchmarks 1 & 2, where only a single agent (the ego agent) will spawn in the map. On the **multi_node** branch, the simulator is modified for Benchmark 3, where two agents will spawn in the map. We'll go over how these agents are controlled in a following section. -->
-
 # Installation
-<!---Before cloning this repo, you'll need to install Docker. Note that this environment is only tested on Ubuntu. You'll also need ROS on your host system. --->
 
 **Supported System:**
 
 - Ubuntu (tested on 20.04) with an NVIDIA gpu and nvidia-docker2 support
-- Windows 10 and macOS (using noVNC)
+- Windows 10, macOS, and Ubuntu without an NVIDIA gpu (using noVNC)
 
-**Dependencies (with an nvidia gpu):**
+This installation guide will be split into instruction for systems with or without an NVIDIA gpu.
+
+
+## With an NVIDIA gpu:
+
+**Install the following dependencies:**
 
 - **Docker** Follow the instructions [here](https://docs.docker.com/install/linux/docker-ce/ubuntu/) to install Docker. A short tutorial can be found [here](https://docs.docker.com/get-started/) if you're not familiar with Docker. If you followed the post-installation steps you won't have to prepend your docker and docker-compose commands with sudo.
 - **nvidia-docker2**, follow the instructions [here](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) if you have a support GPU. It is also possible to use Intel integrated graphics to forward the display, see details instructions from the Rocker repo.
 - **rocker** [https://github.com/osrf/rocker](https://github.com/osrf/rocker). This is a tool developed by OSRF to run Docker images with local support injected. We use it for GUI forwarding.
 
-**Dependencies (without an nvidia gpu):**
+**Installing the simulation:**
 
-If your system does not support nvidia-docker2, noVNC will have to be used to forward the display.
-- Again you'll need **Docker**. Follow the instruction above.
-- Additionally you'll need **docker-compose**. Follow the instruction [here](https://docs.docker.com/compose/install/) to install docker-compose.
-- You won't need nvidia-docker2 or rocker.
-
-**Installation (with NVIDIA gpu):**
-
-1. Clone this repo 
+1. Clone this repo
 2. Build the docker image by:
 ```bash
 $ cd f1tenth_gym_ros
@@ -46,9 +30,17 @@ $ docker build -t f1tenth_gym_ros -f Dockerfile .
 3. To run the containerized environment, start a docker container by running the following. (example showned here with nvidia-docker support). By running this, the current directory that you're in (should be `f1tenth_gym_ros`) is mounted in the container at `/sim_ws/src/f1tenth_gym_ros`. Which means that the changes you make in the repo on the host system will also reflect in the container.
 ```bash
 $ rocker --nvidia --x11 --volume .:/sim_ws/src/f1tenth_gym_ros -- f1tenth_gym_ros
-``` 
+```
 
-**Installation (without NVIDIA gpu):**
+## Without an NVIDIA gpu:
+
+**Install the following dependencies:**
+
+If your system does not support nvidia-docker2, noVNC will have to be used to forward the display.
+- Again you'll need **Docker**. Follow the instruction from above.
+- Additionally you'll need **docker-compose**. Follow the instruction [here](https://docs.docker.com/compose/install/) to install docker-compose.
+
+**Installing the simulation:**
 
 1. Clone this repo 
 2. Build the docker image by:
@@ -60,15 +52,15 @@ $ docker build -t f1tenth_gym_ros -f Dockerfile .
 ```bash
 $ docker-compose up
 ``` 
-4. In a separate terminal, run the following, and you'll have the same bash interface. Again tmux is available for convenience.
+4. In a separate terminal, run the following, and you'll have the a bash session in the simulation container. `tmux` is available for convenience.
 ```bash
 $ docker exec -it f1tenth_gym_ros_sim_1 /bin/bash
 ```
 5. In your browser, navigate to [http://localhost:8080/vnc.html](http://localhost:8080/vnc.html), you should see the noVNC logo with the connect button. Click the connect button to connect to the session.
 
-**Launching the Simulation**
+# Launching the Simulation
 
-1. tmux is also included in the contianer, so you can create multiple terminals in the same environment.
+1. `tmux` is included in the contianer, so you can create multiple bash sessions in the same terminal.
 2. To launch the simulation, make sure you source both the ROS2 setup script and the local workspace setup script. Run the following in the bash session from the container:
 ```bash
 $ source /opt/ros/foxy/setup.bash
@@ -77,60 +69,62 @@ $ ros2 launch f1tenth_gym_ros gym_bridge.launch
 ```
 A rviz window should pop up showing the simulation either on your host system or in the browser window depending on the display forwarding you chose.
 
-<!-- > **When you're creating your own launch file to launch your node, please include ```gym_bridge_host.launch``` in the ```launch``` directory in your own launch file by putting this line in your launch file:**
-> ```xml
-> <include file="$(find f1tenth_gym_ros)/launch/gym_bridge_host.launch"/>
-> ```
+You can then run another node by creating another bash session in `tmux`.
 
-5. An example agent launch file is in ```launch/agent_template.launch```. After you build your workspace after ```catkin_make```, you can run the agent template by running:
-```bash
-$ roslaunch f1tenth_gym_ros agent_template.launch
-```
-You should see an rviz window show up, showing the map, the two cars (ego is blue and opponent is orange), and the LaserScan of the ego car. The opponent is running pure pursuit around the track, and the ego agent is not moving.
- -->
 # Configuring the simulation
-The configuration file for the simulation is at `f1tenth_gym_ros/config/sim.yaml`
-TODO
+- The configuration file for the simulation is at `f1tenth_gym_ros/config/sim.yaml`.
+- Topic names and namespaces can be configured but is recommended to leave uncahnged.
+- The map can be changed via the `map_path` parameter. You'll have to use the full path to the map file in the container. The map follows the ROS convention. It is assumed that the image file and the `yaml` file for the map are in the same directory with the same name. See the note below about mounting a volume to see where to put your map file.
+- The `num_agent` parameter can be changed to either 1 or 2 for single or two agent racing.
+- The ego and opponent starting pose can also be changed via parameters, these are in the global map coordinate frame.
 
-# Available Topics for subscription
-TODO
-<!-- ```/scan```: The ego agent's laser scan
+The entire directory of the repo is mounted to a workspace `/sim_ws/src` as a package. All changes made in the repo on the host system will also reflect in the container. After changing the configuration, run `colcon build` again in the container workspace to make sure the changes are reflected.
 
-```/odom```: The ego agent's odometry
+# Topics published by the simulation
 
-```/opp_odom```: The opponent agent's odometry
+In **single** agent:
 
-```/opp_scan```: The opponent agent's laser scan (only available on the multi_node branch)
+`/scan`: The ego agent's laser scan
 
-```/map```: The map of the environment
+`/ego_racecar/odom`: The ego agent's odometry
 
-```/race_info```: Information of the environment including both agents' elapsed runtimes, both agents' lap count, and both agents' collsion info. **Currently, the race ends after both agents finish two laps, so the elapsed times will stop increasing after both lap counts are > 2**
+`/map`: The map of the environment
 
-# Developing and creating your own agent in ROS
-A basic dummy agent node is provided in ```scripts/dummy_agent_node.py```. Launch your own node in your launch file, and don't forget to include ```gym_bridge_host.launch``` in your own launch file.
+A `tf` tree is also maintained.
 
-On the **master** branch for single agent simulation, publish your drive message on the ```/drive``` topic using the AckermannDriveStamped message type. The simulation is stepped by a callback function subscribed to the drive topic.
+In **two** agents:
 
-On the **multi_node** branch for two-agent simulation, publish the ego agent's drive commands to ```/drive```, and the opponent agent's drive commands to ```/opp_drive```. At this point, we're not providing any agents built in for testing. A good way to start test your algorithms in this setting is to use another algorithm that you've created, or even the same algorithm.
+In addition to the topics available in the single agent scenario, these topics are also available:
 
-# Changing maps
-After you've ran the ```build_docker.sh``` script, you can copy the corresponding .yaml and image file into two directories: ```f1tenth_gym_ros/maps``` and ```f1tenth_gym_ros/f1tenth_gym/maps```. Then change the ```map_path``` and ```map_img_ext``` parameters in ```f1tenth_gym_ros/params.yaml``` to the corresponding paths. Lastly, change the ```map``` argument in ```f1tenth_gym_ros/launch/gym_bridge.launch``` to the new map.
+`/opp_scan`: The opponent agent's laser scan
 
-After making all the changes, make sure you run ```build_docker.sh``` to rebuild the container.
+`/ego_racecar/opp_odom`: The opponent agent's odometry for the ego agent's planner
 
-You can find a collection of maps including the ones from past competitions here: https://github.com/f1tenth/f1tenth_simulator/tree/master/maps
+`/opp_racecar/odom`: The opponent agents' odometry
 
-# TODO
-- [x] Two-way comm tests
-- [x] RobotModel state update
-- [x] Some way to notify collision between agents
-- [x] Some way to notify two cars finishing fixed number of laps
-- [x] Since we have timer update instead of action stepping, what is the notion of 'done'?
-- [x] Publish more topics on collsions, laptime, and done
-- [x] Integrate example test agents
-- [ ] ~~Integrate competent racing agents (with random order when testing)~~
-- [x] Fix mismatch between ray casted scan and robot model
-- [ ] ~~Add instruction in README for rebuilding image when remote repo updates~~
-- [ ] Handle env physics when collisions happen (agent-agent, agent-env)
-- [ ] ~~Add some parameterization on racing scenarios~~
- -->
+`/opp_racecar/opp_odom`: The ego agent's odometry for the opponent agent's planner
+
+# Topics subscribed by the simulation
+
+In **single** agent:
+
+`/drive`: The ego agent's drive command via `AckermannDriveStamped` messages
+
+`/initalpose`: This is the topic for resetting the ego's pose via RViz's 2D Pose Estimate tool. Do **NOT** publish directly to this topic unless you know what you're doing.
+
+TODO: kb teleop topics
+
+In **two** agents:
+
+In addition to all topics in the single agent scenario, these topics are also available:
+
+`/opp_drive`: The opponent agent's drive command via `AckermannDriveStamped` messages
+
+`/goal_pose`: This is the topic for resetting the opponent agent's pose via RViz's 2D Goal Pose tool. Do **NOT** publish directly to this topic unless you know what you're doing.
+
+# Developing and creating your own agent in ROS 2
+
+There are multiple ways to launch your own agent to control the vehicles.
+
+- The first one is creating a new package for your agent in the `/sim_ws` workspace inside the sim container. After launch the simulation, launch the agent node in another bash session while the sim is running.
+- The second one is to create a new ROS 2 container for you agent node. Then create your own package and nodes inside. Launch the sim container and the agent container both with `host` networking. The two containers should be able to discover and talk to each other on different topics.

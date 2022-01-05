@@ -32,16 +32,7 @@ RUN apt-get update --fix-missing && \
                        python3-pip \
                        tmux
 
-RUN pip3 install --upgrade pip
-RUN pip3 install numpy \
-                 scipy \
-                 Pillow \
-                 gym \
-                 pyyaml \
-                 llvmlite \
-                 numba \
-                 pyglet \
-                 transforms3d
+RUN pip3 install transforms3d
 
 # f1tenth gym
 RUN git clone https://github.com/f1tenth/f1tenth_gym

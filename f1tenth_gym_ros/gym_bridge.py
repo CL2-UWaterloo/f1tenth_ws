@@ -192,7 +192,11 @@ class GymBridge(Node):
         rqz = pose_msg.pose.pose.orientation.z
         rqw = pose_msg.pose.pose.orientation.w
         _, _, rtheta = euler.quat2euler([rqw, rqx, rqy, rqz], axes='sxyz')
-        self.obs, _ , self.done, _ = self.env.reset(np.array([[rx, ry, rtheta]]))
+        if self.has_opp:
+            opp_pose = [self.obs['poses_x'][1], self.obs['poses_y'][1], self.obs['poses_theta'][1]]
+            self.obs, _ , self.done, _ = self.env.reset(np.array([[rx, ry, rtheta], opp_pose]))
+        else:
+            self.obs, _ , self.done, _ = self.env.reset(np.array([[rx, ry, rtheta]]))
 
     def opp_reset_callback(self, pose_msg):
         if self.has_opp:
