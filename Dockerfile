@@ -44,6 +44,7 @@ RUN mkdir -p sim_ws/src/f1tenth_gym_ros
 COPY . /sim_ws/src/f1tenth_gym_ros
 RUN source /opt/ros/foxy/setup.bash && \
     cd sim_ws/ && \
+    apt-get update --fix-missing && \
     rosdep install -i --from-path src --rosdistro foxy -y && \
     colcon build
 
