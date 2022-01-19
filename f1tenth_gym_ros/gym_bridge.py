@@ -261,8 +261,6 @@ class GymBridge(Node):
         self._publish_laser_transforms(ts)
         self._publish_wheel_transforms(ts)
 
-        # TODO: pub race info?
-
     def _update_sim_state(self):
         self.ego_scan = list(self.obs['scans'][0])
         if self.has_opp:
