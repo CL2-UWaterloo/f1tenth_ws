@@ -30,6 +30,7 @@ RUN apt-get update --fix-missing && \
                        nano \
                        vim \
                        python3-pip \
+                       libeigen3-dev \
                        tmux
 
 RUN pip3 install transforms3d
