@@ -32,7 +32,7 @@ RUN apt-get update --fix-missing && \
                        python3-pip \
                        libeigen3-dev \
                        tmux
-
+RUN apt-get -y dist-upgrade
 RUN pip3 install transforms3d
 
 # f1tenth gym
