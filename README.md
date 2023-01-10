@@ -5,11 +5,36 @@ This is a containerized ROS communication bridge for the F1TENTH gym environment
 
 **Supported System:**
 
+- Ubuntu (tested on 20.04) native with ROS 2
 - Ubuntu (tested on 20.04) with an NVIDIA gpu and nvidia-docker2 support
 - Windows 10, macOS, and Ubuntu without an NVIDIA gpu (using noVNC)
 
-This installation guide will be split into instruction for systems with or without an NVIDIA gpu.
+This installation guide will be split into instruction for installing the ROS 2 package natively, and for systems with or without an NVIDIA gpu in Docker containers.
 
+## Native on Ubuntu 20.04
+
+**Install the following dependencies:**
+- **ROS 2** Follow the instructions [here](https://docs.ros.org/en/foxy/Installation.html) to install ROS 2 Foxy.
+- **F1TENTH Gym**
+  ```bash
+  git clone https://github.com/f1tenth/f1tenth_gym
+  cd f1tenth_gym && pip3 install -e .
+  ```
+
+**Installing the simulation:**
+- Create a workspace: ```mkdir -p sim_ws/src```
+- Clone the repo into the workspace:
+  ```bash
+  cd sim_ws/src
+  git clone https://github.com/f1tenth/f1tenth_gym_ros
+  ```
+- Install dependencies with rosdep:
+  ```bash
+  source /opt/ros/foxy/setup.bash
+  cd ..
+  rosdep install -i --from-path src --rosdistro foxy -y
+  ```
+- Build the workspace: ```colcon build```
 
 ## With an NVIDIA gpu:
 
