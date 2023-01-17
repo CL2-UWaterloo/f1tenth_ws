@@ -68,20 +68,15 @@ If your system does not support nvidia-docker2, noVNC will have to be used to fo
 **Installing the simulation:**
 
 1. Clone this repo 
-2. Build the docker image by:
+2. Bringup the novnc container and the sim container with docker-compose:
 ```bash
-$ cd f1tenth_gym_ros
-$ docker build -t f1tenth_gym_ros -f Dockerfile .
-```
-3. Bringup the novnc container and the sim container with docker-compose:
-```bash
-$ docker-compose up
+docker-compose up
 ``` 
-4. In a separate terminal, run the following, and you'll have the a bash session in the simulation container. `tmux` is available for convenience.
+3. In a separate terminal, run the following, and you'll have the a bash session in the simulation container. `tmux` is available for convenience.
 ```bash
-$ docker exec -it f1tenth_gym_ros_sim_1 /bin/bash
+docker exec -it f1tenth_gym_ros-sim-1 /bin/bash
 ```
-5. In your browser, navigate to [http://localhost:8080/vnc.html](http://localhost:8080/vnc.html), you should see the noVNC logo with the connect button. Click the connect button to connect to the session.
+4. In your browser, navigate to [http://localhost:8080/vnc.html](http://localhost:8080/vnc.html), you should see the noVNC logo with the connect button. Click the connect button to connect to the session.
 
 # Launching the Simulation
 
