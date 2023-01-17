@@ -24,6 +24,7 @@ version: '3'
 services:
   sim:
     image: f1tenth_gym_ros
+    build: ./
     volumes: 
       - .:/sim_ws/src/f1tenth_gym_ros
     environment:
