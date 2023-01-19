@@ -22,12 +22,14 @@ This installation guide will be split into instruction for installing the ROS 2 
   ```
 
 **Installing the simulation:**
-- Create a workspace: ```mkdir -p sim_ws/src```
+- Create a workspace: ```cd $HOME && mkdir -p sim_ws/src```
 - Clone the repo into the workspace:
   ```bash
-  cd sim_ws/src
+  cd $HOME/sim_ws/src
   git clone https://github.com/f1tenth/f1tenth_gym_ros
   ```
+- Update correct parameter for path to map file:
+  Go to `sim.yaml` [https://github.com/f1tenth/f1tenth_gym_ros/blob/main/config/sim.yaml](https://github.com/f1tenth/f1tenth_gym_ros/blob/main/config/sim.yaml) in your cloned repo, change the `map_path` parameter to point to the correct location. It should be `'<your_home_dir>/sim_ws/src/f1tenth_gym_ros/maps/levin'`
 - Install dependencies with rosdep:
   ```bash
   source /opt/ros/foxy/setup.bash
