@@ -1,5 +1,5 @@
 # F1TENTH Autonomous Racing Research
-This a repository for doing autonomous racing research running on F1TENTH. Forked from [f1tenth_gym_ros](https://github.com/f1tenth/f1tenth_gym_ros). 
+This a repository for doing autonomous racing research running on [F1TENTH](https://f1tenth.org/). Forked from [f1tenth_gym_ros](https://github.com/f1tenth/f1tenth_gym_ros). 
 
 Added multiple ROS2 packages (mainly solutions to [F1TENTH Labs](https://github.com/f1tenth/f1tenth_labs)), including:
 - [PID controller](./nodes/wall_follow/) $\rightarrow$ `nodes/wall_follow`
