@@ -39,16 +39,16 @@ $ docker exec -it f1tenth-autonomous-racing-research-sim-1 /bin/bash
 ### Personal Reference
 I personally do development on a remote server, so I need to run port forwarding using the following command:
 ```bash
-ssh -L 8081:localhost:8081 s36gong@trpro-ubuntu1.watocluster.local
+ssh -NfL 8081:localhost:8081 s36gong@trpro-ubuntu1.watocluster.local
 ```
 
 # Launching the Simulation
 1. `tmux` is included in the contianer, so you can create multiple bash sessions in the same terminal.
 2. To launch the simulation, make sure you source both the ROS2 setup script and the local workspace setup script. Run the following in the bash session from the container:
 ```bash
-$ source /opt/ros/foxy/setup.bash
-$ source install/local_setup.bash
-$ ros2 launch f1tenth_gym_ros gym_bridge_launch.py
+source /opt/ros/foxy/setup.bash
+source install/local_setup.bash
+ros2 launch f1tenth_gym_ros gym_bridge_launch.py
 ```
 A rviz window should pop up showing the simulation either on your host system or in the browser window depending on the display forwarding you chose.
 
