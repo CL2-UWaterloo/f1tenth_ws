@@ -1,55 +1,12 @@
-# F1TENTH gym environment ROS2 communication bridge
-This is a containerized ROS communication bridge for the F1TENTH gym environment that turns it into a simulation in ROS2.
+# F1TENTH Autonomous Racing Research
+This a repository for doing autonomous racing research running on F1TENTH. Forked from the F1TENTH gym environment, and added multiple ROS2 packages such as a [PID controller](./nodes/wall_follow/)  (`nodes/wall_follow` folder) , [scan matching](./nodes/scan_matching) (`nodes/scan_matching`), and [RRT*](./nodes/rrt) (`nodes/rrt`).
 
-# Installation
-
-**Supported System:**
-
-- Ubuntu (tested on 20.04) native with ROS 2
-- Ubuntu (tested on 20.04) with an NVIDIA gpu and nvidia-docker2 support
-- Windows 10, macOS, and Ubuntu without an NVIDIA gpu (using noVNC)
-
-This installation guide will be split into instruction for installing the ROS 2 package natively, and for systems with or without an NVIDIA gpu in Docker containers.
-
-## Native on Ubuntu 20.04
-
-**Install the following dependencies:**
-- **ROS 2** Follow the instructions [here](https://docs.ros.org/en/foxy/Installation.html) to install ROS 2 Foxy.
-- **F1TENTH Gym**
-  ```bash
-  git clone https://github.com/f1tenth/f1tenth_gym
-  cd f1tenth_gym && pip3 install -e .
-  ```
-
-**Installing the simulation:**
-- Create a workspace: ```cd $HOME && mkdir -p sim_ws/src```
-- Clone the repo into the workspace:
-  ```bash
-  cd $HOME/sim_ws/src
-  git clone https://github.com/f1tenth/f1tenth_gym_ros
-  ```
-- Update correct parameter for path to map file:
-  Go to `sim.yaml` [https://github.com/f1tenth/f1tenth_gym_ros/blob/main/config/sim.yaml](https://github.com/f1tenth/f1tenth_gym_ros/blob/main/config/sim.yaml) in your cloned repo, change the `map_path` parameter to point to the correct location. It should be `'<your_home_dir>/sim_ws/src/f1tenth_gym_ros/maps/levine'`
-- Install dependencies with rosdep:
-  ```bash
-  source /opt/ros/foxy/setup.bash
-  cd ..
-  rosdep install -i --from-path src --rosdistro foxy -y
-  ```
-- Build the workspace: ```colcon build```
-
-## With an NVIDIA gpu:
-
-**Install the following dependencies:**
-
-- **Docker** Follow the instructions [here](https://docs.docker.com/install/linux/docker-ce/ubuntu/) to install Docker. A short tutorial can be found [here](https://docs.docker.com/get-started/) if you're not familiar with Docker. If you followed the post-installation steps you won't have to prepend your docker and docker-compose commands with sudo.
-- **nvidia-docker2**, follow the instructions [here](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) if you have a support GPU. It is also possible to use Intel integrated graphics to forward the display, see details instructions from the Rocker repo. If you are on windows with an NVIDIA GPU, you'll have to use WSL (Windows Subsystem for Linux). Please refer to the guide [here](https://developer.nvidia.com/cuda/wsl), [here](https://docs.nvidia.com/cuda/wsl-user-guide/index.html), and [here](https://dilililabs.com/zh/blog/2021/01/26/deploying-docker-with-gpu-support-on-windows-subsystem-for-linux/).
-- **rocker** [https://github.com/osrf/rocker](https://github.com/osrf/rocker). This is a tool developed by OSRF to run Docker images with local support injected. We use it for GUI forwarding. If you're on Windows, WSL should also support this.
-
-**Installing the simulation:**
+## Installation
+### With an NVIDIA gpu
+You need **Docker**, **nvidia-docker2** and **rocker** and installed.
 
 1. Clone this repo
-2. Build the docker image by:
+2. Build the docker image by running:
 ```bash
 $ cd f1tenth_gym_ros
 $ docker build -t f1tenth_gym_ros -f Dockerfile .
@@ -59,29 +16,33 @@ $ docker build -t f1tenth_gym_ros -f Dockerfile .
 $ rocker --nvidia --x11 --volume .:/sim_ws/src/f1tenth_gym_ros -- f1tenth_gym_ros
 ```
 
-## Without an NVIDIA gpu:
-
-**Install the following dependencies:**
-
-If your system does not support nvidia-docker2, noVNC will have to be used to forward the display.
-- Again you'll need **Docker**. Follow the instruction from above.
-- Additionally you'll need **docker-compose**. Follow the instruction [here](https://docs.docker.com/compose/install/) to install docker-compose.
-
-**Installing the simulation:**
+### Without an NVIDIA gpu
+You need **Docker** installed.
 
 1. Clone this repo 
-2. Bringup the novnc container and the sim container with docker-compose:
+2. Build the docker image by:
 ```bash
-docker-compose up
-``` 
-3. In a separate terminal, run the following, and you'll have the a bash session in the simulation container. `tmux` is available for convenience.
-```bash
-docker exec -it f1tenth_gym_ros-sim-1 /bin/bash
+$ cd f1tenth_gym_ros
+$ docker build -t f1tenth_gym_ros -f Dockerfile .
 ```
-4. In your browser, navigate to [http://localhost:8080/vnc.html](http://localhost:8080/vnc.html), you should see the noVNC logo with the connect button. Click the connect button to connect to the session.
+3. Bringup the novnc container and the sim container with docker-compose:
+```bash
+$ docker-compose up
+``` 
+4. In a separate terminal, run the following, and you'll have the a bash session in the simulation container. `tmux` is available for convenience.
+```bash
+$ docker exec -it f1tenth-autonomous-racing-research-sim-1 /bin/bash
+```
+5. In your browser, navigate to [http://localhost:8081/vnc.html](http://localhost:8081/vnc.html), you should see the noVNC logo with the connect button. Click the connect button to connect to the session.
+
+
+### Personal Reference
+I personally do development on a remote server, so I need to run port forwarding using the following command:
+```bash
+ssh -L 8081:localhost:8081 s36gong@trpro-ubuntu1.watocluster.local
+```
 
 # Launching the Simulation
-
 1. `tmux` is included in the contianer, so you can create multiple bash sessions in the same terminal.
 2. To launch the simulation, make sure you source both the ROS2 setup script and the local workspace setup script. Run the following in the bash session from the container:
 ```bash
