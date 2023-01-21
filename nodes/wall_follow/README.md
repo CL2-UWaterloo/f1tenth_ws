@@ -1,4 +1,6 @@
 # Wall Follow 
+Personal notes From Lab3 of F1TENTH, original lab handout can be found [here](https://github.com/f1tenth/f1tenth_labs/blob/S2023/lab3/latex/lab3.pdf).
+
 The wall follow node implements a simple PID controller for the car to autonomously drive forward while staying centered.
 
 We have two control objectives:

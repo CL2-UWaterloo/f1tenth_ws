@@ -1,5 +1,10 @@
 # F1TENTH Autonomous Racing Research
-This a repository for doing autonomous racing research running on F1TENTH. Forked from the F1TENTH gym environment, and added multiple ROS2 packages such as a [PID controller](./nodes/wall_follow/)  (`nodes/wall_follow` folder) , [scan matching](./nodes/scan_matching) (`nodes/scan_matching`), and [RRT*](./nodes/rrt) (`nodes/rrt`).
+This a repository for doing autonomous racing research running on F1TENTH. Forked from [f1tenth_gym_ros](https://github.com/f1tenth/f1tenth_gym_ros). 
+
+Added multiple ROS2 packages (mainly solutions to [F1TENTH Labs](https://github.com/f1tenth/f1tenth_labs)), including:
+- [PID controller](./nodes/wall_follow/) $\rightarrow$ `nodes/wall_follow`
+- [scan matching](./nodes/scan_matching) $\rightarrow$ `nodes/scan_matching` (To be completed)
+- [RRT*](./nodes/rrt) $\rightarrow$ `nodes/rrt` (To be completed)
 
 ## Installation
 ### With an NVIDIA gpu
