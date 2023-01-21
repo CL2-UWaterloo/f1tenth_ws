@@ -1,0 +1,148 @@
+\documentclass[letta4 paper]{article}
+% Set target color model to RGB
+\usepackage[inner=2.0cm,outer=2.0cm,top=2.5cm,bottom=2.5cm]{geometry}
+\usepackage{setspace}
+\usepackage[rgb]{xcolor}
+\usepackage{verbatim}
+\usepackage{subcaption}
+\usepackage{amsgen,amsmath,amstext,amsbsy,amsopn,tikz,amssymb,tkz-linknodes}
+\usepackage{fancyhdr}
+\usepackage[colorlinks=true, urlcolor=blue,  linkcolor=blue, citecolor=blue]{hyperref}
+\usepackage[colorinlistoftodos]{todonotes}
+\usepackage{rotating}
+\usepackage{listings}
+\usepackage{amsmath,amsfonts,amssymb}
+\usepackage{amsmath}
+\lstset{
+%	language=bash,
+	basicstyle=\ttfamily
+}
+
+\newcommand{\ra}[1]{\renewcommand{\arraystretch}{#1}}
+
+\newtheorem{thm}{Theorem}[section]
+\newtheorem{prop}[thm]{Proposition}
+\newtheorem{lem}[thm]{Lemma}
+\newtheorem{cor}[thm]{Corollary}
+\newtheorem{defn}[thm]{Definition}
+\newtheorem{rem}[thm]{Remark}
+\numberwithin{equation}{section}
+\graphicspath{ {./img/} }
+
+\newcommand{\homework}[6]{
+   \pagestyle{myheadings}
+   \thispagestyle{plain}
+   \newpage
+   \setcounter{page}{1}
+   \noindent
+   \begin{center}
+   \framebox{
+      \vbox{\vspace{2mm}
+    \hbox to 6.28in { {\bf F1TENTH Autonomous Racing \hfill {\small (#2)}} }
+       \vspace{6mm}
+       \hbox to 6.28in { {\Large \hfill #1  \hfill} }
+       \vspace{6mm}
+       \hbox to 6.28in { {\it Instructor: {\rm #3} \hfill Name: {\rm #5}, StudentID: {\rm #6}} }
+       %\hbox to 6.28in { {\it T\textbf{A:} #4  \hfill #6}}
+      \vspace{2mm}}
+   }
+   \end{center}
+   \markboth{#5 -- #1}{#5 -- #1}
+   \vspace*{4mm}
+}
+
+
+\newcommand{\problem}[3]{~\\\fbox{\textbf{Problem #1: #2}}\hfill (#3 points)\newline}
+\newcommand{\subproblem}[1]{~\newline\textbf{(#1)}}
+\newcommand{\D}{\mathcal{D}}
+\newcommand{\Hy}{\mathcal{H}}
+\newcommand{\VS}{\textrm{VS}}
+\newcommand{\solution}{~\newline\textbf{\textit{(Solution)}} }
+
+\newcommand{\bbF}{\mathbb{F}}
+\newcommand{\bbX}{\mathbb{X}}
+\newcommand{\bI}{\mathbf{I}}
+\newcommand{\bX}{\mathbf{X}}
+\newcommand{\bY}{\mathbf{Y}}
+\newcommand{\bepsilon}{\boldsymbol{\epsilon}}
+\newcommand{\balpha}{\boldsymbol{\alpha}}
+\newcommand{\bbeta}{\boldsymbol{\beta}}
+\newcommand{\0}{\mathbf{0}}
+
+
+\usepackage{booktabs}
+
+
+
+\begin{document}
+
+	\homework {Lab 5: Scan Matching}{Due Date:}{INSTRUCTOR}{}{STUDENT NAME}{ID}
+	\thispagestyle{empty}
+	% -------- DO NOT REMOVE THIS LICENSE PARAGRAPH	----------------%
+	\begin{table}[h]
+		\begin{tabular}{l p{14cm}}
+		\raisebox{-2cm}{\includegraphics[scale=0.5, height=2.5cm]{f1_stickers_03} } & \textit{This lab and all related course material on \href{http://f1tenth.org/}{F1TENTH Autonomous Racing} has been developed by the Safe Autonomous Systems Lab at the University of Pennsylvania (Dr. Rahul Mangharam). It is licensed under a \href{https://creativecommons.org/licenses/by-nc-sa/4.0/}{Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License.} You may download, use, and modify the material, but must give attribution appropriately. Best practices can be found \href{https://wiki.creativecommons.org/wiki/best_practices_for_attribution}{here}.}
+		\end{tabular}
+	\end{table}
+	% -------- DO NOT REMOVE THIS LICENSE PARAGRAPH	----------------%
+	
+	\noindent \large{\textbf{Course Policy:}} Read all the instructions below carefully before you start working on the assignment, and before you make a submission. All sources of material must be cited. The University Academic Code of Conduct will be strictly enforced.
+	\\
+	\\
+	\textbf{THIS IS A GROUP ASSIGNMENT}. Submit one from each team.\\
+
+	 \section{Theoretical Questions}
+	 \begin{enumerate}
+	 	\item $M_{i}=\left(\begin{array}{cccc}{1} & {0} & {p_{i 0}} & {-p_{i 1}} \\ {0} & {1} & {p_{i 1}} & {p_{i 0}}\end{array}\right)$
+ 		\begin{enumerate}
+ 		\item Show that $B_{i} :=M_{i}^{T} M_{i}$ is symmetric. \\
+ 		\textbf{Solution:}
+ 		\\
+ 		\\
+ 		Answer here
+  		\\
+ 		\\		
+ 		
+ 		
+ 		\item Demonstrate that $B_{i}$ is positive semi-definite\\
+ 		\textbf{Solution:}
+ 		\\
+ 		\\
+ 		Answer here
+ 		\\
+ 		\\		
+ 		
+	 	\end{enumerate}
+ 		
+ 		\item The following is the optimization problem:
+ 		\[ 
+ 		x^{*}=\operatorname{argmin}_{x \in \mathbb{R}^{4}} \sum_{i=1}^{n}\left\|M_{i} x-\pi_{i}\right\|_{2}^{2} \quad \text { s.t. } \quad x_{3}^{2}+x_{4}^{2}=1
+ 		\] 
+ 		\begin{enumerate}
+		\item Find the matrices M, W and g which give you the formulation 
+		\[
+		 x^{*}=\operatorname{argmin}_{x \in \mathbb{R}^{4}} x^{T} M x+g^{T} x 
+		\quad \text { s.t. } x^{T} W x=1
+		\]
+ 		\textbf{Solution:}
+		\\
+		\\
+		Answer here
+		\\
+		\\		
+		
+		\item Show that M and W are positive semi definite.
+ 		\textbf{Solution:}
+		\\
+		\\
+		Answer here
+		\\
+		\\		
+		
+ 		\end{enumerate}
+	 	
+	 \end{enumerate}
+
+
+			
+\end{document} 
