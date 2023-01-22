@@ -42,8 +42,8 @@ bridge:
     scan_beams: 1080
 
     # map parameters
-    map_path: '/sim_ws/src/f1tenth_gym_ros/maps/levine'
-    map_img_ext: '.png'
+    map_path: '/sim_ws/src/f1tenth_gym_ros/maps/e7_floor5_clean'
+    map_img_ext: '.pgm'
 
     # opponent parameters
     num_agent: 1

@@ -1,7 +1,6 @@
-//C++ library includes
 #include <memory> //for smart pointers
 //#include <chrono> //for time 
-#include <math.h> //for isnan, isinf etc.
+#include <math.h>
 #include <string>
 #include <cstdlib> //for abs value function
 #include <vector> /// CHECK: might cause errors due to double header in linker
@@ -11,8 +10,6 @@
 #include <fstream>
 #include <algorithm> //for max function
 
-//#define EIGEN_DONT_ALIGN_STATICALLY
-//Eigen
 #include <Eigen/Eigen>
 
 
@@ -31,7 +28,8 @@
 //#include <tf2/LinearMath/Matrix3x3.h>
 //#include <tf2/LinearMath/Quaternion.h>
 
-//other macros
+#define SIMULATION 1 // TO CHANGE TO 0 WHEN RUNNING THE CAR PHYSICALLY
+
 #define _USE_MATH_DEFINES
 #define WAYPOINTS_PATH "/sim_ws/src/pure_pursuit/src/waypoints_odom.csv"
 #define LOOKAHEAD 0.50 // in meters
@@ -51,8 +49,6 @@ class PurePursuit : public rclcpp::Node {
 public:
     PurePursuit() : Node("pure_pursuit_node") {
         // initialise parameters
-        this->declare_parameter("go", true);
-        drive_flag = this->get_parameter("go").as_bool();
         //set parameter during run time with: ros2 param set <node_name> <parameter_name> <value>
         //set parameter during launch time with: -p :=
 
@@ -94,15 +90,18 @@ public:
     Eigen::Matrix3d rotation_m;
 
     //topic names
-    std::string odom_topic = "/ego_racecar/odom";
+    #if SIMULATION
+        std::string odom_topic = "/ego_racecar/odom";
+        std::string car_refFrame = "ego_racecar/base_link";
+    #else
+        std::string odom_topic = "/odom";
+        std::string car_refFrame = "/base_link";
+    #endif
     std::string drive_topic = "/drive";
-    std::string car_refFrame = "ego_racecar/base_link";
     std::string global_refFrame = "map"; //TODO: might have to add backslashes before
     //std::string rviz_waypoints_topic = "/waypoints";
     std::string rviz_waypointselected_topic = "/waypoints_selected";
 
-    //struct initialisation
-    bool drive_flag; //parameter to freeze car
     
     //file object
     std::fstream csvFile_waypoints; 
@@ -125,12 +124,12 @@ public:
     //private functions
     double to_radians(double degrees) {
         double radians;
-        return radians = degrees*M_PI/180;
+        return radians = degrees*M_PI/180.0;
     }
 
     double to_degrees(double radians) {
         double degrees;
-        return degrees = radians*180/M_PI;
+        return degrees = radians*180.0/M_PI;
     }
     
     double p2pdist(double &x1, double &x2, double &y1, double &y2) {
@@ -266,14 +265,9 @@ public:
         auto drive_msgObj = ackermann_msgs::msg::AckermannDriveStamped();
         drive_msgObj.drive.steering_angle = std::min(steering_angle, to_radians(STEERING_LIMIT)); //ensure steering angle is dynamically capable
 
-
-        if (drive_flag == false) {
-            drive_msgObj.drive.speed = 0.0;
-        }
-        else {drive_msgObj.drive.speed = get_velocity(drive_msgObj.drive.steering_angle);}
+        drive_msgObj.drive.speed = get_velocity(drive_msgObj.drive.steering_angle);
 
         publisher_drive->publish(drive_msgObj);
-        RCLCPP_INFO (this->get_logger(), "driveflag: %s", (drive_flag ? "true" : "false"));
         RCLCPP_INFO (this->get_logger(), "Speed: %f ..... Steering Angle: %f", drive_msgObj.drive.speed, to_degrees(drive_msgObj.drive.steering_angle));
     }
 
@@ -309,40 +303,3 @@ int main(int argc, char **argv)
     rclcpp::shutdown();
     return 0;
 }
-
-/*
-    steps: - subscribe to odom message to get car's ground truth
-           - use particle filter to get local 
-
-    TODO: - run pure pursuit using waypoints generated from track
-          - run slam_toolbox and localisation filter 
-          - generate waypoints using spline (write python script) or remote controller 
-          - run pure pursuit on the car --> need to subscribe to particle filter subscriber to get localisation
-
-    Do lab 5, 7, 8 in Waterloo + 9 (project with Yash)
-
-    TODO: use lejung's csv file
-
-    Questions: 
-    - how do we get the waypoints in the vehicles reference frame --> convert using tf2 or nav odom heading
-
-    TODO: - add condition to make sure the car follows in the right direction --> convert all points to car's ref frame
-                                                                              --> use Ct x transform and compare points
-                                                                              --> 
-          - add waypoint visualiser
-
-
-    Failuremodes: - tf2
-                  - point downloading (look eof)
-                  - Eigen Vector2d instead of 3d
-                  - Eigen compilation issues --> see Eigen hints
-
-    Generally work on optimising for speed
-    Look into using Eigen and building with eigen dependencies
-
-    TODO: implement interpolation
-
-    TODO: ways to improve pure pursuit: - interpolate/project waypoints
-                                        - tune controller
-                                        - generate better waypoints
-*/
