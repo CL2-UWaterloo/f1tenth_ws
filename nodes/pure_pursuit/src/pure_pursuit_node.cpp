@@ -263,7 +263,11 @@ public:
 
     void publish_message (double steering_angle) {
         auto drive_msgObj = ackermann_msgs::msg::AckermannDriveStamped();
-        drive_msgObj.drive.steering_angle = std::min(steering_angle, to_radians(STEERING_LIMIT)); //ensure steering angle is dynamically capable
+        if (steering_angle < 0.0) {
+            drive_msgObj.drive.steering_angle = std::max(steering_angle, -to_radians(STEERING_LIMIT)); //ensure steering angle is dynamically capable
+        } else {
+            drive_msgObj.drive.steering_angle = std::min(steering_angle, to_radians(STEERING_LIMIT)); //ensure steering angle is dynamically capable
+        }
 
         drive_msgObj.drive.speed = get_velocity(drive_msgObj.drive.steering_angle);
 
