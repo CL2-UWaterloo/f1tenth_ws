@@ -32,7 +32,7 @@
 
 #define _USE_MATH_DEFINES
 #define WAYPOINTS_PATH "/sim_ws/src/pure_pursuit/src/waypoints_odom.csv"
-#define LOOKAHEAD 0.50 // in meters
+#define LOOKAHEAD 1.5 // in meters
 #define K_p 0.5
 #define STEERING_LIMIT 25 //degrees
 
@@ -83,8 +83,8 @@ public:
         //double x_worldRef, y_worldRef, x_carRef, y_carRef;
         int index;
 
-        Eigen::Vector3d p1_world;
-        Eigen::Vector3d p1_car;// p2_world, p2_car;// p_car;
+        Eigen::Vector3d p1_world; // Coordinate of point from world reference frame
+        Eigen::Vector3d p1_car; // Coordinate of point from car reference frame (to be calculated)
     };
 
     Eigen::Matrix3d rotation_m;
@@ -225,6 +225,7 @@ public:
         geometry_msgs::msg::TransformStamped transformStamped;
         
         try {
+            // Get the transform from the base_link reference to world reference frame
             transformStamped = tf_buffer_->lookupTransform(car_refFrame, global_refFrame,tf2::TimePointZero);
         } 
         catch (tf2::TransformException & ex) {
@@ -239,7 +240,6 @@ public:
     }
 
     double p_controller () { //pass waypoint
-        
         double radial_dist = waypoints.p1_car.norm();
         double angle = K_p*(2*(waypoints.p1_car(1))/(pow(radial_dist,2)));
 
