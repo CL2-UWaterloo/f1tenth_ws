@@ -92,9 +92,9 @@ public:
     //topic names
     #if SIMULATION
         std::string odom_topic = "/ego_racecar/odom";
-        std::string car_refFrame = "ego_racecar/base_link";
+        std::string car_refFrame = "/ego_racecar/base_link";
     #else
-        std::string odom_topic = "/odom";
+        std::string odom_topic = "/pf/pose/odom"; from here: https://github.com/f1tenth/particle_filter/blob/foxy-devel/particle_filter/particle_filter.py
         std::string car_refFrame = "/base_link";
     #endif
     std::string drive_topic = "/drive";
