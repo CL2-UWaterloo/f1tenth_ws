@@ -28,7 +28,7 @@
 //#include <tf2/LinearMath/Matrix3x3.h>
 //#include <tf2/LinearMath/Quaternion.h>
 
-#define SIMULATION 1 // TO CHANGE TO 0 WHEN RUNNING THE CAR PHYSICALLY
+#define SIMULATION 0 // TO CHANGE TO 0 WHEN RUNNING THE CAR PHYSICALLY
 
 #define _USE_MATH_DEFINES
 #define WAYPOINTS_PATH "/sim_ws/src/pure_pursuit/src/waypoints_odom.csv"
