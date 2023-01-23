@@ -20,7 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-FROM osrf/ros:foxy-desktop
+FROM ros:foxy
 
 SHELL ["/bin/bash", "-c"]
 
@@ -31,7 +31,8 @@ RUN apt-get update --fix-missing && \
                        vim \
                        python3-pip \
                        libeigen3-dev \
-                       tmux
+                       tmux \
+                       ros-foxy-rviz2
 RUN apt-get -y dist-upgrade
 RUN pip3 install transforms3d
 
