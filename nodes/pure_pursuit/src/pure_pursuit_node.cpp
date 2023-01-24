@@ -5,7 +5,6 @@
 #include <cstdlib> //for abs value function
 #include <vector> /// CHECK: might cause errors due to double header in linker
 #include <sstream> //for handling csv extraction
-//#include <cmath> //may need
 #include <iostream> //both for input/output and file stream and handling
 #include <fstream>
 #include <algorithm> //for max function
@@ -28,12 +27,14 @@
 //#include <tf2/LinearMath/Matrix3x3.h>
 //#include <tf2/LinearMath/Quaternion.h>
 
-#define SIMULATION 0 // TO CHANGE TO 0 WHEN RUNNING THE CAR PHYSICALLY
+#define SIMULATION 1 // TO CHANGE TO 0 WHEN RUNNING THE CAR PHYSICALLY
 
 #define _USE_MATH_DEFINES
 #define WAYPOINTS_PATH "/sim_ws/src/pure_pursuit/src/waypoints_odom.csv"
-#define LOOKAHEAD 1.5 // in meters
+#define LOOKAHEAD 0.5 // in meters
 #define K_p 0.5
+#define K_i 0
+#define K_d 0
 #define STEERING_LIMIT 25 //degrees
 
 //using namespaces 
@@ -75,7 +76,7 @@ public:
     ~PurePursuit() {}
 
     //EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-    private:
+private:
     //global static (to be shared by all objects) and dynamic variables (each instance gets its own copy -> managed on the stack)
     struct csvFileData{
         std::vector<double> X;
@@ -89,13 +90,21 @@ public:
 
     Eigen::Matrix3d rotation_m;
 
+    // PID CONTROL PARAMS
+    double prev_error = 0.0;
+    double error = 0.0;
+    double integral = 0.0;
+    double start_t = -1;
+    double curr_t = 0.0;
+    double prev_t = 0.0;
+
     //topic names
     #if SIMULATION
         std::string odom_topic = "/ego_racecar/odom";
-        std::string car_refFrame = "/ego_racecar/base_link";
+        std::string car_refFrame = "ego_racecar/base_link";
     #else
-        std::string odom_topic = "/pf/pose/odom"; from here: https://github.com/f1tenth/particle_filter/blob/foxy-devel/particle_filter/particle_filter.py
-        std::string car_refFrame = "/base_link";
+        std::string odom_topic = "/pf/pose/odom"; // from here: https://github.com/f1tenth/particle_filter/blob/foxy-devel/particle_filter/particle_filter.py
+        std::string car_refFrame = "laser"; // TODO: Publish transform from base_link to laser, this is not done automatically? 
     #endif
     std::string drive_topic = "/drive";
     std::string global_refFrame = "map"; //TODO: might have to add backslashes before
@@ -239,9 +248,32 @@ public:
         waypoints.p1_car = (rotation_m*waypoints.p1_world) + translation_v;
     }
 
-    double p_controller () { //pass waypoint
-        double radial_dist = waypoints.p1_car.norm();
-        double angle = K_p*(2*(waypoints.p1_car(1))/(pow(radial_dist,2)));
+    double pid_controller(const nav_msgs::msg::Odometry::ConstSharedPtr odom_submsgObj) { // pass waypoint
+        /*
+        To design our PID controller, we define our error term to be the angle the car needs to correct itself, e = theta = y/r.
+
+        Ideally, waypoints.p1_car(1) = 0, meaning we are algiend with our waypoint. We also have a bigger error
+
+
+        */
+        double r = waypoints.p1_car.norm(); // r = sqrt(x^2 + y^2)
+        double y = waypoints.p1_car(1);
+
+        this->prev_error = this->error;
+        this->error = asin(y / r);
+        this->integral += this->error;
+        this->prev_t = this->curr_t;
+        this->curr_t = (double) odom_submsgObj->header.stamp.nanosec * (double)10e-9 + (double) odom_submsgObj->header.stamp.sec;
+        if (this->start_t == 0.0) {
+            this->start_t = this->curr_t;
+        }
+
+        double angle = 0.0;
+        if (this->prev_t == 0.0) return angle; // Else division will be zero
+        angle = K_p * this->error + K_i * this->integral * (this->curr_t - this->start_t) + K_d * (this->error - this->prev_error)/(this->curr_t - this->prev_t);
+
+        RCLCPP_INFO(this->get_logger(), "target x y z (from `base_link` frame) : %f %f %f ", waypoints.p1_car(0), waypoints.p1_car(1), waypoints.p1_car(2) );
+        RCLCPP_INFO(this->get_logger(), "integral : %f ", this->integral);
 
         return angle;
     }
@@ -288,7 +320,7 @@ public:
 
         // Calculate curvature/steering angle
         //p controller
-        double steering_angle = p_controller();
+        double steering_angle = pid_controller(odom_submsgObj);
 
         // TODO: publish drive message, don't forget to limit the steering angle.
         //publish object and message: AckermannDriveStamped on drive topic 
