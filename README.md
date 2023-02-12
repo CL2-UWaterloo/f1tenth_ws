@@ -13,12 +13,11 @@ You need **Docker**, **nvidia-docker2** and **rocker** and installed.
 1. Clone this repo
 2. Build the docker image by running:
 ```bash
-$ cd f1tenth_gym_ros
-$ docker build -t f1tenth_gym_ros -f Dockerfile .
+docker build -t f1tenth_gym_ros -f Dockerfile .
 ```
 3. To run the containerized environment, start a docker container by running the following. (example showned here with nvidia-docker support). By running this, the current directory that you're in (should be `f1tenth_gym_ros`) is mounted in the container at `/sim_ws/src/f1tenth_gym_ros`. Which means that the changes you make in the repo on the host system will also reflect in the container.
 ```bash
-$ rocker --nvidia --x11 --volume .:/sim_ws/src/f1tenth_gym_ros -- f1tenth_gym_ros
+rocker --nvidia --x11 --volume .:/sim_ws/src/f1tenth_gym_ros -- f1tenth_gym_ros
 ```
 
 ### Without an NVIDIA gpu
@@ -27,22 +26,21 @@ You need **Docker** installed.
 1. Clone this repo 
 2. Build the docker image by:
 ```bash
-$ cd f1tenth_gym_ros
-$ docker build -t f1tenth_gym_ros -f Dockerfile .
+docker build -t f1tenth_gym_ros -f Dockerfile .
 ```
 3. Bringup the novnc container and the sim container with docker-compose:
 ```bash
-$ docker-compose up
+docker-compose up
 ``` 
 4. In a separate terminal, run the following, and you'll have the a bash session in the simulation container. `tmux` is available for convenience.
 ```bash
-$ docker exec -it f1tenth-autonomous-racing-research-sim-1 /bin/bash
+docker exec -it f1tenth-autonomous-racing-research-sim-1 /bin/bash
 ```
 5. In your browser, navigate to [http://localhost:8081/vnc.html](http://localhost:8081/vnc.html), you should see the noVNC logo with the connect button. Click the connect button to connect to the session.
 
 
 ### Personal Reference
-I personally do development on a remote server, so I need to run port forwarding using the following command:
+Sometimes, I do development on a remote server, in which case I need to run port forwarding using the following command:
 ```bash
 ssh -NfL 8081:localhost:8081 s36gong@trpro-ubuntu1.watocluster.local
 ```
