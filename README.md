@@ -17,7 +17,7 @@ docker build -t f1tenth_gym_ros -f Dockerfile .
 ```
 3. To run the containerized environment, start a docker container by running the following. (example showned here with nvidia-docker support). By running this, the current directory that you're in (should be `f1tenth_gym_ros`) is mounted in the container at `/sim_ws/src/f1tenth_gym_ros`. Which means that the changes you make in the repo on the host system will also reflect in the container.
 ```bash
-rocker --nvidia --x11 --volume .:/sim_ws/src/f1tenth_gym_ros -- f1tenth_gym_ros
+sudo rocker --nvidia --x11 --volume .:/sim_ws/src/f1tenth_gym_ros ./nodes:/sim_ws/src/ -- f1tenth_gym_ros
 ```
 
 ### Without an NVIDIA gpu

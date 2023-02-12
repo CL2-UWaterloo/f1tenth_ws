@@ -27,7 +27,7 @@
 //#include <tf2/LinearMath/Matrix3x3.h>
 //#include <tf2/LinearMath/Quaternion.h>
 
-#define SIMULATION 1 // TO CHANGE TO 0 WHEN RUNNING THE CAR PHYSICALLY
+#define SIMULATION 0 // TO CHANGE TO 0 WHEN RUNNING THE CAR PHYSICALLY
 
 #define _USE_MATH_DEFINES
 #define WAYPOINTS_PATH "/sim_ws/src/pure_pursuit/src/waypoints_odom.csv"
@@ -54,10 +54,10 @@ public:
         //set parameter during launch time with: -p :=
 
         //initialise subscriber sharedptr obj
-        subscription_odom = this->create_subscription<nav_msgs::msg::Odometry>(odom_topic, 10, std::bind(&PurePursuit::odom_callback, this, _1));
+        subscription_odom = this->create_subscription<nav_msgs::msg::Odometry>(odom_topic, 5, std::bind(&PurePursuit::odom_callback, this, _1));
 
         //initialise publisher sharedptr obj
-        publisher_drive = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>(drive_topic, 10);
+        publisher_drive = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>(drive_topic, 5);
         //vis_path_pub = this->create_publisher<visualization_msgs::msg::MarkerArray>(rviz_waypoints_topic, 1000);
         vis_point_pub = this->create_publisher<visualization_msgs::msg::Marker>(rviz_waypointselected_topic, 10);
 
@@ -272,7 +272,7 @@ private:
         if (this->prev_t == 0.0) return angle; // Else division will be zero
         angle = K_p * this->error + K_i * this->integral * (this->curr_t - this->start_t) + K_d * (this->error - this->prev_error)/(this->curr_t - this->prev_t);
 
-        RCLCPP_INFO(this->get_logger(), "target x y z (from `base_link` frame) : %f %f %f ", waypoints.p1_car(0), waypoints.p1_car(1), waypoints.p1_car(2) );
+        RCLCPP_INFO(this->get_logger(), "target x y (`base_link` frame) : %f %f ", waypoints.p1_car(0), waypoints.p1_car(1));
         RCLCPP_INFO(this->get_logger(), "integral : %f ", this->integral);
 
         return angle;
@@ -281,14 +281,14 @@ private:
     double get_velocity(double steering_angle) {
         double velocity;
         if (abs(steering_angle) > to_radians(0.0) && abs(steering_angle) < to_radians(10.0)) {
-            // velocity = 4.5; // If you want to go crazy
-            velocity = 1.5;
+            velocity = 3.0; // If you want to go crazy
+            // velocity = 1.5;
         } 
         else if (abs(steering_angle) > to_radians(10.0) && abs(steering_angle) < to_radians(20.0)) {
-            velocity = 1.0;
+            velocity = 2.0;
         } 
         else {
-            velocity = 0.5;
+            velocity = 1.5;
         }
         return velocity;
     }
