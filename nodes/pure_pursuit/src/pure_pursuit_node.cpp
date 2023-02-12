@@ -30,13 +30,17 @@
 #define SIMULATION 0 // TO CHANGE TO 0 WHEN RUNNING THE CAR PHYSICALLY
 
 #define _USE_MATH_DEFINES
-#define WAYPOINTS_PATH "/sim_ws/src/pure_pursuit/src/waypoints_odom.csv"
-#define LOOKAHEAD 0.5 // in meters
+#define MAX_LOOKAHEAD 2.0 // in meters
 #define K_p 0.5
 #define K_i 0
 #define K_d 0
 #define STEERING_LIMIT 25 //degrees
 
+#if SIMULATION
+    #define WAYPOINTS_PATH "/sim_ws/src/pure_pursuit/src/waypoints_odom.csv"
+#else
+    #define WAYPOINTS_PATH "/f1tenth_ws/src/pure_pursuit/src/waypoints_odom.csv"
+#endif
 //using namespaces 
 //used for bind (uncomment below)
 using std::placeholders::_1;
@@ -54,10 +58,10 @@ public:
         //set parameter during launch time with: -p :=
 
         //initialise subscriber sharedptr obj
-        subscription_odom = this->create_subscription<nav_msgs::msg::Odometry>(odom_topic, 5, std::bind(&PurePursuit::odom_callback, this, _1));
+        subscription_odom = this->create_subscription<nav_msgs::msg::Odometry>(odom_topic, 25, std::bind(&PurePursuit::odom_callback, this, _1));
 
         //initialise publisher sharedptr obj
-        publisher_drive = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>(drive_topic, 5);
+        publisher_drive = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>(drive_topic, 25);
         //vis_path_pub = this->create_publisher<visualization_msgs::msg::MarkerArray>(rviz_waypoints_topic, 1000);
         vis_point_pub = this->create_publisher<visualization_msgs::msg::Marker>(rviz_waypointselected_topic, 10);
 
@@ -117,6 +121,7 @@ private:
 
     //struct initialisation
     csvFileData waypoints;
+    int num_waypoints;
 
     //declare subscriber sharedpointer obj
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr subscription_odom;
@@ -148,7 +153,15 @@ private:
 
     void download_waypoints () { //put all data in vectors
         csvFile_waypoints.open(WAYPOINTS_PATH, std::ios::in);
-        RCLCPP_INFO (this->get_logger(), "%s", (csvFile_waypoints.is_open() ? "fileOpened" : "fileNOTopened"));
+
+        if (!csvFile_waypoints.is_open()) {
+            RCLCPP_ERROR(this->get_logger(), "%s", "Cannot open CSV file!");
+            return;
+        } else {
+            RCLCPP_INFO(this->get_logger(), "CSV File Opened");
+
+        }
+
         
         //std::vector<std::string> row;
         std::string line, word, temp;
@@ -172,6 +185,9 @@ private:
         }
 
         csvFile_waypoints.close();
+        RCLCPP_INFO(this->get_logger(), "CSV File Closed");
+        num_waypoints = waypoints.X.size();
+
     }
 
     void visualize_points(Eigen::Vector3d &point) {
@@ -196,15 +212,49 @@ private:
     void get_waypoint(double x_car_world, double y_car_world) {
 
         double longest_distance = 0;
-        int final_i = 0;
-        for (unsigned int i = waypoints.index;i<waypoints.X.size(); i++) {
-            if (p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world) < LOOKAHEAD && p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world) > longest_distance) {
-                longest_distance = p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world);
-                final_i = i;
+        int final_i = -1;
+        // Main logic: Search within the next 500 points
+        int start = waypoints.index;
+        int end = (waypoints.index + 500) % num_waypoints;
+
+        if (end < start) { // Loop around
+            for (int i=start; i<num_waypoints; i++) {
+                if (p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world) <= MAX_LOOKAHEAD 
+                && p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world) >= longest_distance) {
+                    longest_distance = p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world);
+                    final_i = i;
+                }
+            }
+            for (int i=0; i<end; i++) {
+                if (p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world) <= MAX_LOOKAHEAD 
+                && p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world) >= longest_distance) {
+                    longest_distance = p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world);
+                    final_i = i;
+                }
+            }
+        } else {
+            for (int i=start; i<end; i++) {
+                if (p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world) <= MAX_LOOKAHEAD 
+                && p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world) >= longest_distance) {
+                    longest_distance = p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world);
+                    final_i = i;
+                }
+            }
+
+        }
+
+        if (final_i == -1) { // if we haven't found anything, search from the beginning
+            final_i = 0; // Temporarily assign to 0
+            for (unsigned int i=0;i<waypoints.X.size(); i++) {
+                if (p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world) <= MAX_LOOKAHEAD 
+                && p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world) >= longest_distance) {
+                    longest_distance = p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world);
+                    final_i = i;
+                }
             }
         }
         waypoints.index = final_i; // If a waypoint is not found, then this temporarily sets it to 0. Allows us to look around the waypoints forever
-        RCLCPP_INFO (this->get_logger(), "waypoint index: %d", waypoints.index);
+        RCLCPP_INFO(this->get_logger(), "waypoint index: %d ... distance: %f", waypoints.index, p2pdist(waypoints.X[waypoints.index], x_car_world, waypoints.Y[waypoints.index], y_car_world));
     }
 
     void quat_to_rot(double q0, double q1, double q2, double q3) { //w,x,y,z -> q0,q1,q2,q3
@@ -262,6 +312,7 @@ private:
         this->prev_error = this->error;
         this->error = asin(y / r);
         this->integral += this->error;
+        this->integral = std::min(this->integral, 999999.0); // Clip the integral
         this->prev_t = this->curr_t;
         this->curr_t = (double) odom_submsgObj->header.stamp.nanosec * (double)10e-9 + (double) odom_submsgObj->header.stamp.sec;
         if (this->start_t == 0.0) {
@@ -272,24 +323,24 @@ private:
         if (this->prev_t == 0.0) return angle; // Else division will be zero
         angle = K_p * this->error + K_i * this->integral * (this->curr_t - this->start_t) + K_d * (this->error - this->prev_error)/(this->curr_t - this->prev_t);
 
-        RCLCPP_INFO(this->get_logger(), "target x y (`base_link` frame) : %f %f ", waypoints.p1_car(0), waypoints.p1_car(1));
-        RCLCPP_INFO(this->get_logger(), "integral : %f ", this->integral);
+        RCLCPP_INFO(this->get_logger(), "waypoint x y : %f %f ", waypoints.p1_car(0), waypoints.p1_car(1));
 
         return angle;
     }
 
     double get_velocity(double steering_angle) {
         double velocity;
-        if (abs(steering_angle) > to_radians(0.0) && abs(steering_angle) < to_radians(10.0)) {
-            velocity = 3.0; // If you want to go crazy
+        if (abs(steering_angle) >= to_radians(0.0) && abs(steering_angle) < to_radians(10.0)) {
+            velocity = 4.5; // If you want to go crazy
             // velocity = 1.5;
         } 
-        else if (abs(steering_angle) > to_radians(10.0) && abs(steering_angle) < to_radians(20.0)) {
-            velocity = 2.0;
+        else if (abs(steering_angle) >= to_radians(10.0) && abs(steering_angle) <= to_radians(20.0)) {
+            velocity = 2.5;
         } 
         else {
-            velocity = 1.5;
+            velocity = 2.0;
         }
+
         return velocity;
     }
 
@@ -308,7 +359,6 @@ private:
     }
 
     void odom_callback(const nav_msgs::msg::Odometry::ConstSharedPtr odom_submsgObj) {
-        
         double x_car_world = odom_submsgObj->pose.pose.position.x;
         double y_car_world = odom_submsgObj->pose.pose.position.y;
         // TODO: find the current waypoint to track using methods mentioned in lecture
