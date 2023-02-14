@@ -27,13 +27,12 @@
 //#include <tf2/LinearMath/Matrix3x3.h>
 //#include <tf2/LinearMath/Quaternion.h>
 
-#define SIMULATION 0 // TO CHANGE TO 0 WHEN RUNNING THE CAR PHYSICALLY
+#define SIMULATION 1 // TO CHANGE TO 0 WHEN RUNNING THE CAR PHYSICALLY
 
 #define _USE_MATH_DEFINES
+#define USE_VARIABLE_LOOKAHEAD 0
 #define MAX_LOOKAHEAD 2.0 // in meters
 #define K_p 0.5
-#define K_i 0
-#define K_d 0
 #define STEERING_LIMIT 25 //degrees
 
 #if SIMULATION
@@ -94,13 +93,6 @@ private:
 
     Eigen::Matrix3d rotation_m;
 
-    // PID CONTROL PARAMS
-    double prev_error = 0.0;
-    double error = 0.0;
-    double integral = 0.0;
-    double start_t = -1;
-    double curr_t = 0.0;
-    double prev_t = 0.0;
 
     //topic names
     #if SIMULATION
@@ -185,9 +177,15 @@ private:
         }
 
         csvFile_waypoints.close();
-        RCLCPP_INFO(this->get_logger(), "CSV File Closed");
         num_waypoints = waypoints.X.size();
-
+        RCLCPP_INFO(this->get_logger(), "Finished loading %d waypoints from %d", num_waypoints, WAYPOINTS_PATH);
+        
+        double average_dist_between_waypoints = 0.0;
+        for (int i=0;i<num_waypoints-1;i++) {
+            average_dist_between_waypoints += p2pdist(waypoints.X[i], waypoints.X[i+1], waypoints.Y[i], waypoints.Y[i+1]);
+        }
+        average_dist_between_waypoints /= num_waypoints;
+        RCLCPP_INFO(this->get_logger(), "Average distance between waypoints: %f", average_dist_between_waypoints);
     }
 
     void visualize_points(Eigen::Vector3d &point) {
@@ -216,6 +214,8 @@ private:
         // Main logic: Search within the next 500 points
         int start = waypoints.index;
         int end = (waypoints.index + 500) % num_waypoints;
+        
+        // TODO: Add dynamic lookahead distance based on velocity if the flag USE_VARIABLE_LOOKAHEAD is set
 
         if (end < start) { // Loop around
             for (int i=start; i<num_waypoints; i++) {
@@ -298,32 +298,16 @@ private:
         waypoints.p1_car = (rotation_m*waypoints.p1_world) + translation_v;
     }
 
-    double pid_controller(const nav_msgs::msg::Odometry::ConstSharedPtr odom_submsgObj) { // pass waypoint
+    double p_controller(const nav_msgs::msg::Odometry::ConstSharedPtr odom_submsgObj) { // pass waypoint
         /*
-        To design our PID controller, we define our error term to be the angle the car needs to correct itself, e = theta = y/r.
+        To design our P controller, we define our error term to be the angle the car needs to correct itself, e = theta = y/r.
 
-        Ideally, waypoints.p1_car(1) = 0, meaning we are algiend with our waypoint. We also have a bigger error
-
+        Ideally, waypoints.p1_car(1) = 0, meaning we are aligned with our waypoint.
 
         */
         double r = waypoints.p1_car.norm(); // r = sqrt(x^2 + y^2)
         double y = waypoints.p1_car(1);
-
-        this->prev_error = this->error;
-        this->error = asin(y / r);
-        this->integral += this->error;
-        this->integral = std::min(this->integral, 999999.0); // Clip the integral
-        this->prev_t = this->curr_t;
-        this->curr_t = (double) odom_submsgObj->header.stamp.nanosec * (double)10e-9 + (double) odom_submsgObj->header.stamp.sec;
-        if (this->start_t == 0.0) {
-            this->start_t = this->curr_t;
-        }
-
-        double angle = 0.0;
-        if (this->prev_t == 0.0) return angle; // Else division will be zero
-        angle = K_p * this->error + K_i * this->integral * (this->curr_t - this->start_t) + K_d * (this->error - this->prev_error)/(this->curr_t - this->prev_t);
-
-        RCLCPP_INFO(this->get_logger(), "waypoint x y : %f %f ", waypoints.p1_car(0), waypoints.p1_car(1));
+        double angle = K_p * asin(y / r);
 
         return angle;
     }
@@ -355,6 +339,7 @@ private:
         drive_msgObj.drive.speed = get_velocity(drive_msgObj.drive.steering_angle);
 
         publisher_drive->publish(drive_msgObj);
+        RCLCPP_INFO(this->get_logger(), "waypoint x y : %f %f ", waypoints.p1_car(0), waypoints.p1_car(1));
         RCLCPP_INFO (this->get_logger(), "Speed: %f ..... Steering Angle: %f", drive_msgObj.drive.speed, to_degrees(drive_msgObj.drive.steering_angle));
     }
 
@@ -370,7 +355,7 @@ private:
 
         // Calculate curvature/steering angle
         //p controller
-        double steering_angle = pid_controller(odom_submsgObj);
+        double steering_angle = p_controller(odom_submsgObj);
 
         // TODO: publish drive message, don't forget to limit the steering angle.
         //publish object and message: AckermannDriveStamped on drive topic 
