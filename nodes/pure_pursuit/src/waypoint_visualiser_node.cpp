@@ -73,7 +73,7 @@ public:
     //private functions
     
     void download_waypoints () { //put all data in vectors
-        csvFile_waypoints.open("/sim_ws/src/pure_pursuit/src/waypoints_odom.csv", std::ios::in);
+        csvFile_waypoints.open("/sim_ws/src/pure_pursuit/src/racelines/e7_floor5.csv", std::ios::in);
 
         RCLCPP_INFO (this->get_logger(), "%s", (csvFile_waypoints.is_open() ? "fileOpened" : "fileNOTopened"));
         
@@ -158,4 +158,3 @@ int main(int argc, char **argv)
     rclcpp::shutdown();
     return 0;
 }
-

@@ -31,14 +31,18 @@
 
 #define _USE_MATH_DEFINES
 #define USE_VARIABLE_LOOKAHEAD 0
-#define MAX_LOOKAHEAD 2.0 // in meters
+// #define MAX_LOOKAHEAD 2.0 // in meters
+#define MAX_LOOKAHEAD 1.0 // in meters, if you use the optimal raceline
 #define K_p 0.5
 #define STEERING_LIMIT 25 //degrees
 
+// #define FILENAME "waypoints_odom.csv"
+#define FILENAME "racelines/e7_floor5.csv"
+
 #if SIMULATION
-    #define WAYPOINTS_PATH "/sim_ws/src/pure_pursuit/src/waypoints_odom.csv"
+    #define WAYPOINTS_PATH "/sim_ws/src/pure_pursuit/src/" FILENAME
 #else
-    #define WAYPOINTS_PATH "/f1tenth_ws/src/pure_pursuit/src/waypoints_odom.csv"
+    #define WAYPOINTS_PATH "/f1tenth_ws/src/pure_pursuit/src/" FILENAME
 #endif
 //using namespaces 
 //used for bind (uncomment below)
@@ -84,6 +88,7 @@ private:
     struct csvFileData{
         std::vector<double> X;
         std::vector<double> Y;
+        std::vector<double> V;
         //double x_worldRef, y_worldRef, x_carRef, y_carRef;
         int index;
 
@@ -166,10 +171,11 @@ private:
             while (getline(s, word, ',')) {
                 if (!word.empty()) {
                     if (j == 0) {
-                        double x = std::stod(word);
-                        waypoints.X.push_back(x);
+                        waypoints.X.push_back(std::stod(word));
                     } else if (j == 1) {
                         waypoints.Y.push_back(std::stod(word));
+                    } else if (j == 2) {
+                        waypoints.V.push_back(std::stod(word));
                     }
                 }
                 j++;
@@ -323,6 +329,10 @@ private:
         } 
         else {
             velocity = 2.0;
+        }
+        
+        if (waypoints.V[waypoints.index]) { 
+            velocity = waypoints.V[waypoints.index];
         }
 
         return velocity;
