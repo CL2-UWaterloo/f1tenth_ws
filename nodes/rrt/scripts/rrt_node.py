@@ -1,12 +1,19 @@
+#!/usr/bin/env python3
 """
 This file contains the class definition for tree nodes and RRT
 Before you start, please read: https://arxiv.org/pdf/1105.1186.pdf
 """
-import numpy as np
-from numpy import linalg as LA
+
 import math
+import copy
+
+import numpy as np
+from scipy import signal
+from scipy.interpolate import interp1d
+from scipy.spatial.transform import Rotation as R
 
 import rclpy
+from rclpy.duration import Duration
 from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import PoseStamped
@@ -14,147 +21,369 @@ from geometry_msgs.msg import PointStamped
 from geometry_msgs.msg import Pose
 from geometry_msgs.msg import Point
 from nav_msgs.msg import Odometry
-from ackermann_msgs.msg import AckermannDriveStamped, AckermannDrive
 from nav_msgs.msg import OccupancyGrid
+from visualization_msgs.msg import Marker, MarkerArray
+from ackermann_msgs.msg import AckermannDriveStamped, AckermannDrive
 
-# TODO: import as you need
 
-# class def for tree nodes
-# It's up to you if you want to use this
-class Node(object):
-    def __init__(self):
-        self.x = None
-        self.y = None
-        self.parent = None
-        self.cost = None # only used in RRT*
-        self.is_root = False
+class Vertex(object):
+    def __init__(self, pos=None, parent=None):
+        self.pos = pos
+        self.parent = parent
 
-# class def for RRT
+
 class RRT(Node):
     def __init__(self):
-        # topics, not saved as attributes
-        # TODO: grab topics from param file, you'll need to change the yaml file
-        pose_topic = "ego_racecar/odom"
-        scan_topic = "/scan"
+        super().__init__('rrt_node')
 
-        # you could add your own parameters to the rrt_params.yaml file,
-        # and get them here as class attributes as shown above.
+        # improt pure pursuit functions
+        self.L = 3
+        self.pure_pursuit = PurePursuit(L=self.L, segments=1024, filepath="src/RRT/waypoints.csv")
+        self.utils = Utils()
 
-        # TODO: create subscribers
-        self.pose_sub_ = self.create_subscription(
-            PoseStamped,
-            pose_topic,
-            self.pose_callback,
-            1)
-        self.pose_sub_
-
-        self.scan_sub_ = self.create_subscription(
-            LaserScan,
-            scan_topic,
-            self.scan_callback,
-            1)
-        self.scan_sub_
+        # create subscribers
+        self.pose_sub = self.create_subscription(Odometry, "/ego_racecar/odom", self.pose_callback, 1)
+        self.scan_sub = self.create_subscription(LaserScan,  "/scan", self.scan_callback, 1)
 
         # publishers
-        # TODO: create a drive message publisher, and other publishers that you might need
+        self.waypoint_pub = self.create_publisher(Marker, "/waypoint_marker", 10)
+        self.rrt_path_pub = self.create_publisher(Marker, "/rrt_path", 10)
+        self.rrt_node_pub = self.create_publisher(MarkerArray, "/rrt_node_array", 10)
+        self.drive_pub = self.create_publisher(AckermannDriveStamped, "/drive", 10)
+        self.occupancy_grid_pub = self.create_publisher(OccupancyGrid, "/occupancy_grid", 10)
 
-        # class attributes
-        # TODO: maybe create your occupancy grid here
+        # class variables
+        self.grid_height = int(self.L * 10) #in number of cells
+        self.grid_width = int(60)
+        self.occupancy_grid = np.full(shape=(self.grid_height, self.grid_width), fill_value=-1, dtype=int)
+        self.current_pose = None
+        self.goal_pos = None
 
-    def scan_callback(self, scan_msg):
-        """
-        LaserScan callback, you should update your occupancy grid here
+        # constants
+        self.MAX_RANGE = self.L - 0.1
+        self.MIN_ANGLE = np.radians(0) #the ANGLE_OFFSET is used to map stuff from -pi,pi to 0 to 180 with ANGLE_OFFSET (look at oc grid formation below)
+        self.MAX_ANGLE = np.radians(180)
+        self.ANGLE_OFFSET = np.radians(45) #fov = 270. One side = fov/2 = 135. 135-45 = 90 (for occupancy grid)
+        self.IS_OCCUPIED = 100
+        self.IS_FREE = 0
+        self.CELLS_PER_METER = 10 #hence, grid height in m = lookahead = 3
+        self.CELL_Y_OFFSET = (self.grid_width // 2) - 1 #cartesian frame orientation same as that of car local ref frame.
+        self.MAX_RRT_ITER = 100
 
-        Args: 
-            scan_msg (LaserScan): incoming message from subscribed topic
-        Returns:
+        # hyper-parameters
+        self.is_sim = True
+        self.velocity_min = 1.5
+        self.velocity_max = 5.0
+        self.populate_free = True
 
-        """
+        # rrt variables
+        self.path_world = []
+
+    def local_to_grid(self, x, y):
+        i = int(x * -self.CELLS_PER_METER + (self.grid_height -1))
+        j = int(y * -self.CELLS_PER_METER + self.CELL_Y_OFFSET)
+        return (i, j)
+
+    def grid_to_local(self, point):
+        i, j = point[0], point[1]
+        x = (i - (self.grid_height - 1))  / -self.CELLS_PER_METER
+        y = (j - self.CELL_Y_OFFSET) / -self.CELLS_PER_METER
+        return (x, y)
 
     def pose_callback(self, pose_msg):
         """
         The pose callback when subscribed to particle filter's inferred pose
         Here is where the main RRT loop happens
 
-        Args: 
+        Args:
             pose_msg (PoseStamped): incoming message from subscribed topic
-        Returns:
-
         """
+        # determine pose data type (sim vs. car)
+        pose = pose_msg.pose.pose if self.is_sim else pose_msg.pose
 
-        return None
+        # save current car pose
+        self.current_pose = copy.deepcopy(pose)
+
+        # obtain pure pursuit waypoint
+        self.goal_pos, goal_pos_world = self.pure_pursuit.get_waypoint(pose)
+        # self.pure_pursuit.draw_marker(
+        #     pose_msg.header.frame_id,
+        #     pose_msg.header.stamp,
+        #     goal_pos_world,
+        #     self.waypoint_pub
+        # )
+
+    def populate_occupancy_grid(self, ranges, angle_increment):
+        """
+        Populate occupancy grid using lidar scans and save
+        the data in class member variable self.occupancy_grid
+
+        Args:
+            scan_msg (LaserScan): message from lidar scan topic
+        """
+        # reset empty occupacny grid (-1 = unknown)
+        self.occupancy_grid = np.full(shape=(self.grid_height, self.grid_width), fill_value=-1, dtype=int)
+
+        # enumerate over lidar scans
+        for i, dist in enumerate(ranges):
+            # skip scans behind the car
+            theta = (i * angle_increment) - self.ANGLE_OFFSET
+            if theta < self.MIN_ANGLE or theta > self.MAX_ANGLE:
+                continue
+
+            # obtain local coordinate of scan
+            dist_clipped = np.clip(dist, 0, self.MAX_RANGE)
+            x = dist_clipped * np.sin(theta)
+            y = dist_clipped * np.cos(theta) * -1
+
+            # obtain grid indices from local coordinates of scan point
+            i, j = self.local_to_grid(x, y)
+
+            # set occupied space
+            if dist < self.MAX_RANGE:
+                self.occupancy_grid[i, j] = self.IS_OCCUPIED
+
+            #TODO: read up on fast voxel traverse (as compared to flood fill)
+            # set free space by fast voxel traverse
+            if self.populate_free:
+                free_cells = self.utils.traverse_grid(self.local_to_grid(0, 0), (i, j))
+                for cell in free_cells:
+                    if self.occupancy_grid[cell] != self.IS_OCCUPIED:
+                        self.occupancy_grid[cell] = self.IS_FREE
+
+    # NYI
+    def publish_occupancy_grid(self, frame_id, stamp):
+        """
+        Publish populated occupancy grid to ros2 topic
+        Args:
+            scan_msg (LaserScan): message from lidar scan topic
+        """
+        oc = OccupancyGrid()
+        oc.header.frame_id = frame_id
+        oc.header.stamp = stamp
+        oc.info.origin.position.y -= ((self.grid_width / 2) + 1) / 10
+        oc.info.width = self.grid_height
+        oc.info.height = self.grid_width
+        oc.info.resolution = 0.1
+        oc.data = np.fliplr(np.rot90(self.occupancy_grid, k=1)).flatten().tolist()
+        self.occupancy_grid_pub.publish(oc)
+
+    def convolve_occupancy_grid(self):
+        kernel = np.ones(shape=[2, 2])
+        self.occupancy_grid = signal.convolve2d(
+            self.occupancy_grid.astype('int'),
+            kernel.astype('int'),
+            boundary='symm',
+            mode='same'
+        )
+        self.occupancy_grid = np.clip(self.occupancy_grid, -1, 100)
+
+    def drive_to_target(self, point):
+        # calculate curvature/steering angle
+        L = np.linalg.norm(point)
+        y = point[1]
+        angle = (2 * y) / (L**2)
+        angle = np.clip(angle, -0.5, 0.5)
+
+        # determine velocity
+        logit = np.clip(
+            (2.0 / (1.0 + np.exp(-5 * (np.abs(np.degrees(angle)) / 20.0)))) - 1.0,
+            0.0,
+            1.0
+        )
+        velocity = self.velocity_max - (logit * (self.velocity_max - self.velocity_min))
+
+        # publish drive message
+        drive_msg = AckermannDriveStamped()
+        drive_msg.drive.speed          = velocity
+        drive_msg.drive.steering_angle = angle
+        self.drive_pub.publish(drive_msg)
+
+    def scan_callback(self, scan_msg):
+        """
+        LaserScan callback, update occupancy grid and perform RRT
+
+        Args:
+            scan_msg (LaserScan): incoming message from subscribed topic
+        """
+        # make sure we obtain initial pose and goal point
+        if (self.current_pose is None) or (self.goal_pos is None):
+            return
+
+        # populate occupancy grid
+        self.populate_occupancy_grid(scan_msg.ranges, scan_msg.angle_increment)
+        self.convolve_occupancy_grid()
+        self.publish_occupancy_grid(scan_msg.header.frame_id, scan_msg.header.stamp)
+
+        # get path planed in occupancy grid space
+        path_grid = self.rrt()
+
+        # convert path from grid to local coordinates
+        path_local = [self.grid_to_local(point) for point in path_grid]
+
+        if len(path_local) < 2:
+            return
+
+        # navigate to first node in tree
+        self.drive_to_target(path_local[1])
+
+        # rrt visualization
+        self.utils.draw_marker_array(
+            scan_msg.header.frame_id,
+            scan_msg.header.stamp,
+            path_local,
+            self.rrt_node_pub
+        )
+
+        self.utils.draw_lines(
+            scan_msg.header.frame_id,
+            scan_msg.header.stamp,
+            path_local,
+            self.rrt_path_pub
+        )
+
+    def rrt(self):
+        # convert position to occupancy grid indices
+        current_pos = self.local_to_grid(0, 0)
+        goal_pos = self.local_to_grid(self.goal_pos[0], self.goal_pos[1])
+
+        # resample a close point if our goal point is occupied
+        if self.occupancy_grid[goal_pos] == self.IS_OCCUPIED:
+            i, j = self.sample()
+            while np.linalg.norm(np.array([i, j]) - np.array(goal_pos)) > 5:
+                i, j = self.sample()
+            goal_pos = (i, j)
+
+        # initialize start and goal trees
+        T_start = [Vertex(current_pos)]
+        T_goal = [Vertex(goal_pos)]
+
+        # start rrt algorithm
+        for itn in range(self.MAX_RRT_ITER):
+            # sample from free space
+            pos_sampled = self.sample()
+
+            # attempt to expand tree using sampled point
+            T_start, success_start = self.expand_tree(T_start, pos_sampled, check_closer=True)
+            T_goal, success_goal = self.expand_tree(T_goal, pos_sampled)
+
+            # if sampled point can reach both T_start and T_goal
+            # get path from start to goal and return
+            if success_start and success_goal:
+                path = self.find_path(T_start, T_goal, pruning=True)
+                return path
+        return []
 
     def sample(self):
         """
-        This method should randomly sample the free space, and returns a viable point
+        Randomly sample the free space in occupancy grid, and returns its index.
+        If free space has already been populated then just check if sampled
+        cell is free, else do fast voxel traversal for each sampling.
+
+        Returns:
+            (i, j) (int, int): index of free cell in occupancy grid
+        """
+        if self.populate_free:
+            i, j = np.random.randint(self.grid_height), np.random.randint(self.grid_width)
+            while self.occupancy_grid[i, j] != self.IS_FREE:
+                i, j = np.random.randint(self.grid_height), np.random.randint(self.grid_width)
+        else:
+            free = False
+            while not free:
+                i, j = np.random.randint(self.grid_height), np.random.randint(self.grid_width)
+                free = True
+                for cell in self.utils.traverse_grid(self.local_to_grid(0, 0), (i, j)):
+                    if self.occupancy_grid[cell] == self.IS_OCCUPIED:
+                        free = False
+                        break
+        return (i, j)
+
+    def expand_tree(self, tree, sampled_point, check_closer=False):
+        """
+        Attempts to expand tree using the sampled point by
+        checking if it causes collision and if the new node
+        brings the car closer to the goal.
 
         Args:
+            tree ([]): current RRT tree
+            sampled_point: cell sampled in occupancy grid free space
+            check_closer: check if sampled point brings car closer
         Returns:
-            (x, y) (float float): a tuple representing the sampled point
-
+            tree ([]): expanded RRT tree
+            success (bool): whether tree was successfully expanded
         """
-        x = None
-        y = None
-        return (x, y)
+        # get closest node to sampled point in tree
+        idx_nearest = self.nearest(tree, sampled_point)
+        pos_nearest = tree[idx_nearest].pos
 
-    def nearest(self, tree, sampled_point):
+        # check if nearest node -> sampled node causes collision
+        collision = self.check_collision(sampled_point, pos_nearest)
+
+        # check if sampeld point bring car closer to goal compared to the nearest node
+        is_closer = self.is_closer(sampled_point, pos_nearest) if check_closer else True
+
+        # if p_free -> p_nearest causes no collision
+        # then add p_free as child of p_nearest in T_start
+        if is_closer and (not collision):
+            tree.append(Vertex(sampled_point, idx_nearest))
+
+        return tree, (is_closer and (not collision))
+
+    def nearest(self, tree, sampled_cell):
         """
-        This method should return the nearest node on the tree to the sampled point
+        Return the nearest node on the tree to the sampled point
 
         Args:
             tree ([]): the current RRT tree
-            sampled_point (tuple of (float, float)): point sampled in free space
+            sampled_cell (i,j): cell sampled in occupancy grid free space
         Returns:
-            nearest_node (int): index of neareset node on the tree
+            nearest_indx (int): index of neareset node on the tree
         """
-        nearest_node = 0
-        return nearest_node
+        nearest_indx = -1
+        nearest_dist = np.Inf
+        for idx, node in enumerate(tree):
+            dist = np.linalg.norm(np.array(sampled_cell) - np.array(node.pos))
+            if dist < nearest_dist:
+                nearest_dist = dist
+                nearest_indx = idx
+        return nearest_indx
 
-    def steer(self, nearest_node, sampled_point):
+    def is_closer(self, sampled_pos, nearest_pos):
         """
-        This method should return a point in the viable set such that it is closer 
-        to the nearest_node than sampled_point is.
+        Checks if the new sampled node brings the car closer
+        to the goal point then the nearest existing node on the tree
 
         Args:
-            nearest_node (Node): nearest node on the tree to the sampled point
-            sampled_point (tuple of (float, float)): sampled point
+            sampled_pos (i, j): index of sampled pos in occupancy grid
+            nearest_pos (i, j): index of nearest pos in occupancy grid
         Returns:
-            new_node (Node): new node created from steering
+            is_closer (bool): whether the sampled pos brings the car closer
         """
-        new_node = None
-        return new_node
+        a = self.grid_to_local(sampled_pos)
+        b = self.grid_to_local(nearest_pos)
+        return np.linalg.norm(a - self.goal_pos[:2]) < np.linalg.norm(b - self.goal_pos[:2])
 
-    def check_collision(self, nearest_node, new_node):
+    def check_collision(self, cell_a, cell_b):
         """
-        This method should return whether the path between nearest and new_node is
-        collision free.
+        Checks whether the path between two cells
+        in the occupancy grid is collision free.
 
         Args:
-            nearest (Node): nearest node on the tree
-            new_node (Node): new node from steering
+            cell_a (i, j): index of cell a in occupancy grid
+            cell_b (i, j): index of cell b in occupancy grid
         Returns:
-            collision (bool): whether the path between the two nodes are in collision
-                              with the occupancy grid
+            collision (bool): whether path between two cells would cause collision
         """
-        return True
-
-    def is_goal(self, latest_added_node, goal_x, goal_y):
-        """
-        This method should return whether the latest added node is close enough
-        to the goal.
-
-        Args:
-            latest_added_node (Node): latest added node on the tree
-            goal_x (double): x coordinate of the current goal
-            goal_y (double): y coordinate of the current goal
-        Returns:
-            close_enough (bool): true if node is close enoughg to the goal
-        """
+        for cell in self.utils.traverse_grid(cell_a, cell_b):
+            if (cell[0] * cell[1] < 0) or (cell[0] >= self.grid_height) or (cell[1] >= self.grid_width):
+                continue
+            if self.occupancy_grid[cell] == self.IS_OCCUPIED:
+                return True
         return False
 
-    def find_path(self, tree, latest_added_node):
+    def find_path(self, T_start, T_goal, pruning=True):
         """
-        This method returns a path as a list of Nodes connecting the starting point to
+        Returns a path as a list of Nodes connecting the starting point to
         the goal once the latest added node is close enough to the goal
 
         Args:
@@ -163,47 +392,226 @@ class RRT(Node):
         Returns:
             path ([]): valid path as a list of Nodes
         """
-        path = []
+        # traverse up T_start to obtain path to sampled point
+        node = T_start[-1]
+        path_start = [node.pos]
+        while node.parent is not None:
+            node = T_start[node.parent]
+            path_start.append(node.pos)
+
+        # traverse up T_goal to obtain path to sampled point
+        node = T_goal[-1]
+        path_goal = [node.pos]
+        while node.parent is not None:
+            node = T_goal[node.parent]
+            path_goal.append(node.pos)
+
+        # return path
+        path = np.array(path_start[::-1] + path_goal[1:])
+
+        # pruning if enabled
+        if pruning:
+            sub_paths = []
+            for i in range(len(path) - 2):
+                sub_path = path
+                for j in range(i + 2, len(path)):
+                    if not self.check_collision(path[i], path[j]):
+                        sub_path = np.vstack((path[:i+1], path[j:]))
+                sub_paths.append(sub_path)
+
+            costs = np.array([np.linalg.norm(p[1:] - p[:-1]).sum() for p in sub_paths])
+            path = sub_paths[np.argmin(costs)]
         return path
 
 
+class Utils:
+    def __init__(self):
+        pass
 
-    # The following methods are needed for RRT* and not RRT
-    def cost(self, tree, node):
-        """
-        This method should return the cost of a node
+    def draw_marker(self, frame_id, stamp, position, publisher, id=0):
+        marker = Marker()
+        marker.header.frame_id = frame_id
+        marker.header.stamp = stamp
+        marker.id = id
+        marker.type = marker.SPHERE
+        marker.action = marker.ADD
+        marker.scale.x = 0.2
+        marker.scale.y = 0.2
+        marker.scale.z = 0.2
+        marker.color.a = 1.0
+        marker.color.r = 1.0
+        marker.color.g = 1.0
+        marker.color.b = 0.0
+        marker.pose.position.x = position[0]
+        marker.pose.position.y = position[1]
+        marker.pose.position.z = 0.0
+        publisher.publish(marker)
 
-        Args:
-            node (Node): the current node the cost is calculated for
-        Returns:
-            cost (float): the cost value of the node
-        """
-        return 0
+    def draw_marker_array(self, frame_id, stamp, positions, publisher):
+        marker_array = MarkerArray()
+        for i, position in enumerate(positions):
+            marker = Marker()
+            marker.header.frame_id = frame_id
+            marker.header.stamp = stamp
+            marker.id = i
+            marker.type = marker.SPHERE
+            marker.action = marker.ADD
+            marker.scale.x = 0.2
+            marker.scale.y = 0.2
+            marker.scale.z = 0.2
+            marker.color.a = 1.0
+            marker.color.r = 1.0
+            marker.color.g = 1.0
+            marker.color.b = 0.0
+            marker.pose.position.x = position[0]
+            marker.pose.position.y = position[1]
+            marker.pose.position.z = 0.0
+            marker.lifetime = Duration(seconds=0.05).to_msg()
+            marker_array.markers.append(marker)
+        publisher.publish(marker_array)
 
-    def line_cost(self, n1, n2):
-        """
-        This method should return the cost of the straight line between n1 and n2
+    def draw_lines(self, frame_id, stamp, path, publisher):
+        points = []
+        for i in range(len(path) - 1):
+            a = path[i]
+            b = path[i+1]
+            point = Point()
+            point.x = a[0]
+            point.y = a[1]
+            points.append(copy.deepcopy(point))
+            point.x = b[0]
+            point.y = b[1]
+            points.append(copy.deepcopy(point))
 
-        Args:
-            n1 (Node): node at one end of the straight line
-            n2 (Node): node at the other end of the straint line
-        Returns:
-            cost (float): the cost value of the line
-        """
-        return 0
+        line_list = Marker()
+        line_list.header.frame_id = frame_id
+        line_list.header.stamp = stamp
+        line_list.id = 0
+        line_list.type = line_list.LINE_LIST
+        line_list.action = line_list.ADD
+        line_list.scale.x = 0.01
+        line_list.color.a = 1.0
+        line_list.color.r = 0.0
+        line_list.color.g = 0.0
+        line_list.color.b = 1.0
+        line_list.points = points
+        publisher.publish(line_list)
 
-    def near(self, tree, node):
+    def traverse_grid(self, start, end):
         """
-        This method should return the neighborhood of nodes around the given node
+        Bresenham's line algorithm for fast voxel traversal
 
-        Args:
-            tree ([]): current tree as a list of Nodes
-            node (Node): current node we're finding neighbors for
-        Returns:
-            neighborhood ([]): neighborhood of nodes as a list of Nodes
+        CREDIT TO: Rogue Basin
+        CODE TAKEN FROM: http://www.roguebasin.com/index.php/Bresenham%27s_Line_Algorithm
         """
-        neighborhood = []
-        return neighborhood
+        # Setup initial conditions
+        x1, y1 = start
+        x2, y2 = end
+        dx = x2 - x1
+        dy = y2 - y1
+
+        # Determine how steep the line is
+        is_steep = abs(dy) > abs(dx)
+
+        # Rotate line
+        if is_steep:
+            x1, y1 = y1, x1
+            x2, y2 = y2, x2
+
+        # Swap start and end points if necessary and store swap state
+        if x1 > x2:
+            x1, x2 = x2, x1
+            y1, y2 = y2, y1
+
+        # Recalculate differentials
+        dx = x2 - x1
+        dy = y2 - y1
+
+        # Calculate error
+        error = int(dx / 2.0)
+        ystep = 1 if y1 < y2 else -1
+
+        # Iterate over bounding box generating points between start and end
+        y = y1
+        points = []
+        for x in range(x1, x2 + 1):
+            coord = (y, x) if is_steep else (x, y)
+            points.append(coord)
+            error -= abs(dy)
+            if error < 0:
+                y += ystep
+                error += dx
+        return points
+
+
+class PurePursuit:
+    def __init__(self, L=1.7, segments=1024, filepath="src/lab7/waypoints.csv"):
+        self.L = L
+        self.waypoints = self.interpolate_waypoints(
+            file_path=filepath,
+            segments=segments
+        )
+
+    def transform_waypoints(self, waypoints, car_position, pose):
+        # translation
+        waypoints = waypoints - car_position
+
+        # rotation
+        quaternion = np.array([
+            pose.orientation.x,
+            pose.orientation.y,
+            pose.orientation.z,
+            pose.orientation.w
+        ])
+        waypoints = R.inv(R.from_quat(quaternion)).apply(waypoints)
+
+        return waypoints
+
+    def interpolate_waypoints(self, file_path, segments):
+        # Read waypoints from csv
+        points = np.genfromtxt(file_path, delimiter=",")[:, :2]
+
+        # Add first point as last point to complete loop
+        points = np.vstack((points, points[0]))
+
+        # Linear length along the line
+        distance = np.cumsum(np.sqrt(np.sum(np.diff(points, axis=0)**2, axis=1)))
+        distance = np.insert(distance, 0, 0) / distance[-1]
+
+        # Interpolate
+        alpha = np.linspace(0, 1, segments)
+        interpolator = interp1d(distance, points, kind='slinear', axis=0)
+        interpolated_points = interpolator(alpha)
+
+        # Add z-coordinate to be 0
+        interpolated_points = np.hstack(
+            (interpolated_points, np.zeros((interpolated_points.shape[0], 1)))
+        )
+        return interpolated_points
+
+    def get_waypoint(self, pose):
+        # get current position of car
+        position = (pose.position.x, pose.position.y, 0)
+
+        # transform way-points from world to vehicle frame of reference
+        waypoints = self.transform_waypoints(self.waypoints, position, pose)
+
+        # get distance from car to all waypoints
+        distances = np.linalg.norm(waypoints, axis=1)
+
+        # get indices of waypoints that are within L, sorted by descending distance
+        indices_L = np.argsort(np.where(distances < self.L, distances, -1))[::-1]
+        self.CELLS_PER_METER = 10
+        self.CELL_Y_OFFSET = (self.grid_width // 2) - 1
+
+        # set goal point to be the farthest valid waypoint within distance L
+        for i in indices_L:
+            # check waypoint is in front of car
+            x = waypoints[i][0]
+            if x > 0:
+                return waypoints[i], self.waypoints[i]
+        return None, None
+
 
 def main(args=None):
     rclpy.init(args=args)
