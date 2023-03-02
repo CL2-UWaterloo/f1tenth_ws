@@ -1,0 +1,3 @@
+[submodule "nodes/particle_filter"]
+	path = nodes/particle_filter
+	url = https://github.com/f1tenth/particle_filter.git
