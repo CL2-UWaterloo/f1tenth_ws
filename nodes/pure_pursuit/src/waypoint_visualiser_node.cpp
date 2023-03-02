@@ -19,12 +19,16 @@
 #include <geometry_msgs/msg/transform_stamped.hpp>
 
 
-//headers to code written by you
-
-
 //other macros
-#define NODE_NAME "waypoint_visualiser_node" 
 #define _USE_MATH_DEFINES
+#define FILENAME "racelines/e7_floor5.csv"
+#define SIMULATION 1 // TO CHANGE TO 0 WHEN RUNNING THE CAR PHYSICALLY
+
+#if SIMULATION
+    #define WAYPOINTS_PATH "/sim_ws/src/pure_pursuit/src/" FILENAME
+#else
+    #define WAYPOINTS_PATH "/f1tenth_ws/src/pure_pursuit/src/" FILENAME
+#endif
 
 
 using std::placeholders::_1;
@@ -34,8 +38,9 @@ using namespace std::chrono_literals;
 class WaypointVisualiser : public rclcpp::Node {
 
 public:
-    WaypointVisualiser() : Node(NODE_NAME) {
-        
+    WaypointVisualiser() : Node("waypoint_visualiser_node")
+    {
+
         vis_path_pub = this->create_publisher<visualization_msgs::msg::MarkerArray>(rviz_waypoints_topic, 1000);
         timer_ = this->create_wall_timer(500ms, std::bind(&WaypointVisualiser::timer_callback, this));
 
@@ -45,7 +50,6 @@ public:
         download_waypoints();
 
         //copy all data once to data structure initialised before
-
     }
 
     private:
@@ -73,7 +77,7 @@ public:
     //private functions
     
     void download_waypoints () { //put all data in vectors
-        csvFile_waypoints.open("/sim_ws/src/pure_pursuit/src/racelines/e7_floor5.csv", std::ios::in);
+        csvFile_waypoints.open(WAYPOINTS_PATH, std::ios::in);
 
         RCLCPP_INFO (this->get_logger(), "%s", (csvFile_waypoints.is_open() ? "fileOpened" : "fileNOTopened"));
         

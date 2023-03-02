@@ -41,8 +41,13 @@
 
 #if SIMULATION
     #define WAYPOINTS_PATH "/sim_ws/src/pure_pursuit/src/" FILENAME
+    #define ODOM_TOPIC "/ego_racecar/odom";
+    #define CAR_REFFRAME "ego_racecar/base_link";
 #else
     #define WAYPOINTS_PATH "/f1tenth_ws/src/pure_pursuit/src/" FILENAME
+    #define ODOM_TOPIC "/pf/pose/odom" // from running the particle filter https://github.com/f1tenth/particle_filter/blob/foxy-devel/particle_filter/particle_filter.py
+    #define CAR_REFFRAME "laser"; // TODO: Publish static transform from base_link to laser, this is not done automatically? 
+
 #endif
 //using namespaces 
 //used for bind (uncomment below)
@@ -100,13 +105,8 @@ private:
 
 
     //topic names
-    #if SIMULATION
-        std::string odom_topic = "/ego_racecar/odom";
-        std::string car_refFrame = "ego_racecar/base_link";
-    #else
-        std::string odom_topic = "/pf/pose/odom"; // from here: https://github.com/f1tenth/particle_filter/blob/foxy-devel/particle_filter/particle_filter.py
-        std::string car_refFrame = "laser"; // TODO: Publish transform from base_link to laser, this is not done automatically? 
-    #endif
+    std::string odom_topic = ODOM_TOPIC;
+    std::string car_refFrame = CAR_REFFRAME;
     std::string drive_topic = "/drive";
     std::string global_refFrame = "map"; //TODO: might have to add backslashes before
     //std::string rviz_waypoints_topic = "/waypoints";

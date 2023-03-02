@@ -25,6 +25,16 @@ from nav_msgs.msg import OccupancyGrid
 from visualization_msgs.msg import Marker, MarkerArray
 from ackermann_msgs.msg import AckermannDriveStamped, AckermannDrive
 
+SIMULATION = True
+FILENAME = "racelines/e7_floor5.csv"
+
+if SIMULATION:
+    WAYPOINTS_PATH = "/sim_ws/src/pure_pursuit/src/" + FILENAME
+    ODOM_TOPIC = "/ego_racecar/odom"
+else:
+    WAYPOINTS_PATH = "/f1tenth_ws/src/pure_pursuit/src/" + FILENAME
+    ODOM_TOPIC = "/pf/pose/odom"
+
 
 class Vertex(object):
     def __init__(self, pos=None, parent=None):
@@ -38,11 +48,11 @@ class RRT(Node):
 
         # improt pure pursuit functions
         self.L = 3
-        self.pure_pursuit = PurePursuit(L=self.L, segments=1024, filepath="src/RRT/waypoints.csv")
+        self.pure_pursuit = PurePursuit(L=self.L, segments=1024, filepath=WAYPOINTS_PATH)
         self.utils = Utils()
 
-        # create subscribers
-        self.pose_sub = self.create_subscription(Odometry, "/ego_racecar/odom", self.pose_callback, 1)
+
+        self.pose_sub = self.create_subscription(Odometry, ODOM_TOPIC, self.pose_callback, 1)
         self.scan_sub = self.create_subscription(LaserScan,  "/scan", self.scan_callback, 1)
 
         # publishers
@@ -545,7 +555,7 @@ class Utils:
 
 
 class PurePursuit:
-    def __init__(self, L=1.7, segments=1024, filepath="src/lab7/waypoints.csv"):
+    def __init__(self, L=1.7, segments=1024, filepath=WAYPOINTS_PATH):
         self.L = L
         self.waypoints = self.interpolate_waypoints(
             file_path=filepath,
