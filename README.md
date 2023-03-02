@@ -1,12 +1,21 @@
 # F1TENTH Autonomous Racing Research
 This a repository for doing autonomous racing research running on [F1TENTH](https://f1tenth.org/). Forked from [f1tenth_gym_ros](https://github.com/f1tenth/f1tenth_gym_ros). 
 
-Added multiple ROS2 packages (mainly solutions to [F1TENTH Labs](https://github.com/f1tenth/f1tenth_labs)), including:
-- [PID controller](./nodes/wall_follow/) $\rightarrow$ `nodes/wall_follow`
-- [scan matching](./nodes/scan_matching) $\rightarrow$ `nodes/scan_matching` (To be completed)
-- [RRT*](./nodes/rrt) $\rightarrow$ `nodes/rrt` (To be completed)
+The original repository is purely a simulation environment for F1TENTH autonomous racing, without any other ROS2 packages to run code on. This forked repository contains multiple implementations to do autonomous racing (mainly solutions to [F1TENTH Labs](https://github.com/f1tenth/f1tenth_labs)):
 
-## Installation
+Currently Used Algorithms:
+- [Waypoint Generator](./nodes/waypoint_generator/) for generating waypoints $\rightarrow$ `nodes/waypoint_generator`
+	- Soon to be replaced with automatic raceline generation
+- [Pure Pursuit](./nodes/pure_pursuit/) for waypoint following $\rightarrow$ `nodes/pure_pursuit`
+- [Particle Filter](./nodes/particle_filter/) for localization $\rightarrow$ `nodes/particle_filter`
+- [RRT](./nodes/rrt) for obstacle avoidance $\rightarrow$ `nodes/rrt` 
+- [slam_toolbox](https://github.com/SteveMacenski/slam_toolbox) for mapping
+
+Other algorithms that are not used
+- A [PID controller](./nodes/wall_follow/) to follow walls $\rightarrow$ `nodes/wall_follow`
+- [Scan matching](./nodes/scan_matching) $\rightarrow$ `nodes/scan_matching` (To be completed)
+
+# Running Simulation
 ### With an NVIDIA gpu
 You need **Docker**, **nvidia-docker2** and **rocker** and installed.
 
@@ -39,11 +48,6 @@ docker exec -it f1tenth-autonomous-racing-research-sim-1 /bin/bash
 5. In your browser, navigate to [http://localhost:8081/vnc.html](http://localhost:8081/vnc.html), you should see the noVNC logo with the connect button. Click the connect button to connect to the session.
 
 
-### Personal Reference
-Sometimes, I do development on a remote server, in which case I need to run port forwarding using the following command:
-```bash
-ssh -NfL 8081:localhost:8081 s36gong@trpro-ubuntu1.watocluster.local
-```
 
 # Launching the Simulation
 1. `tmux` is included in the contianer, so you can create multiple bash sessions in the same terminal.
@@ -70,11 +74,9 @@ The entire directory of the repo is mounted to a workspace `/sim_ws/src` as a pa
 
 In **single** agent:
 
-`/scan`: The ego agent's laser scan
-
-`/ego_racecar/odom`: The ego agent's odometry
-
-`/map`: The map of the environment
+- `/scan`: The ego agent's laser scan
+- `/ego_racecar/odom`: The ego agent's odometry
+- `/map`: The map of the environment
 
 A `tf` tree is also maintained.
 
@@ -82,21 +84,17 @@ In **two** agents:
 
 In addition to the topics available in the single agent scenario, these topics are also available:
 
-`/opp_scan`: The opponent agent's laser scan
-
-`/ego_racecar/opp_odom`: The opponent agent's odometry for the ego agent's planner
-
-`/opp_racecar/odom`: The opponent agents' odometry
-
-`/opp_racecar/opp_odom`: The ego agent's odometry for the opponent agent's planner
+- `/opp_scan`: The opponent agent's laser scan
+- `/ego_racecar/opp_odom`: The opponent agent's odometry for the ego agent's planner
+- `/opp_racecar/odom`: The opponent agents' odometry
+- `/opp_racecar/opp_odom`: The ego agent's odometry for the opponent agent's planner
 
 # Topics subscribed by the simulation
 
 In **single** agent:
 
-`/drive`: The ego agent's drive command via `AckermannDriveStamped` messages
-
-`/initalpose`: This is the topic for resetting the ego's pose via RViz's 2D Pose Estimate tool. Do **NOT** publish directly to this topic unless you know what you're doing.
+- `/drive`: The ego agent's drive command via `AckermannDriveStamped` messages
+- `/initalpose`: This is the topic for resetting the ego's pose via RViz's 2D Pose Estimate tool. Do **NOT** publish directly to this topic unless you know what you're doing.
 
 TODO: kb teleop topics
 
@@ -104,21 +102,12 @@ In **two** agents:
 
 In addition to all topics in the single agent scenario, these topics are also available:
 
-`/opp_drive`: The opponent agent's drive command via `AckermannDriveStamped` messages
-
-`/goal_pose`: This is the topic for resetting the opponent agent's pose via RViz's 2D Goal Pose tool. Do **NOT** publish directly to this topic unless you know what you're doing.
+- `/opp_drive`: The opponent agent's drive command via `AckermannDriveStamped` messages
+- `/goal_pose`: This is the topic for resetting the opponent agent's pose via RViz's 2D Goal Pose tool. Do **NOT** publish directly to this topic unless you know what you're doing.
 
 # Keyboard Teleop
-
 The keyboard teleop node from `teleop_twist_keyboard` is also installed as part of the simulation's dependency. To enable keyboard teleop, set `kb_teleop` to `True` in `sim.yaml`. After launching the simulation, in another terminal, run:
 ```bash
 ros2 run teleop_twist_keyboard teleop_twist_keyboard
 ```
 Then, press `i` to move forward, `u` and `o` to move forward and turn, `,` to move backwards, `m` and `.` to move backwards and turn, and `k` to stop in the terminal window running the teleop node.
-
-# Developing and creating your own agent in ROS 2
-
-There are multiple ways to launch your own agent to control the vehicles.
-
-- The first one is creating a new package for your agent in the `/sim_ws` workspace inside the sim container. After launch the simulation, launch the agent node in another bash session while the sim is running.
-- The second one is to create a new ROS 2 container for you agent node. Then create your own package and nodes inside. Launch the sim container and the agent container both. With default networking configurations for `docker`, the behavior is to put The two containers on the same network, and they should be able to discover and talk to each other on different topics. If you're using noVNC, create a new service in `docker-compose.yml` for your agent node. You'll also have to put your container on the same network as the sim and novnc containers.
