@@ -1,6 +1,6 @@
 from setuptools import setup
 
-package_name = 'lab7_pkg'
+package_name = 'rrt'
 
 setup(
     name=package_name,
@@ -13,14 +13,14 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='zzangupenn',
-    maintainer_email='zzang@seas.upenn.edu',
-    description='f1tenth lab7_pkg',
+    maintainer='Steven Gong',
+    maintainer_email='s36gong@uwaterloo.ca',
+    description='f1tenth rrt',
     license='TODO: License declaration',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'rrt_node = lab7_pkg.rrt_node:main',
+            'rrt_node = rrt.rrt_node:main',
         ],
     },
 )
