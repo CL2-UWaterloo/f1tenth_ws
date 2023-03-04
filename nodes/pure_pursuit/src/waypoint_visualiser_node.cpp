@@ -1,34 +1,21 @@
 //C++ library includes
-#include <memory> //for smart pointers
-#include <chrono> //for time 
-#include <math.h> //for isnan, isinf etc.
+#include <memory>
+#include <chrono>
+#include <math.h>
 #include <string>
-#include <cstdlib> //for abs value function
-#include <vector> /// CHECK: might cause errors due to double header in linker
-#include <sstream> //for handling csv extraction
-//#include <cmath> //may need
-#include <iostream> //both for input/output and file stream and handling
+#include <cstdlib>
+#include <vector>
+#include <sstream>
+#include <iostream>
 #include <fstream>
 #include <functional>
-
-//ROS related headers
 #include "rclcpp/rclcpp.hpp"
-//message header
 #include "visualization_msgs/msg/marker.hpp"
 #include "visualization_msgs/msg/marker_array.hpp"
 #include <geometry_msgs/msg/transform_stamped.hpp>
 
-
 //other macros
 #define _USE_MATH_DEFINES
-#define FILENAME "racelines/e7_floor5.csv"
-#define SIMULATION 1 // TO CHANGE TO 0 WHEN RUNNING THE CAR PHYSICALLY
-
-#if SIMULATION
-    #define WAYPOINTS_PATH "/sim_ws/src/pure_pursuit/src/" FILENAME
-#else
-    #define WAYPOINTS_PATH "/f1tenth_ws/src/pure_pursuit/src/" FILENAME
-#endif
 
 
 using std::placeholders::_1;
@@ -40,16 +27,17 @@ class WaypointVisualiser : public rclcpp::Node {
 public:
     WaypointVisualiser() : Node("waypoint_visualiser_node")
     {
+        this->declare_parameter("waypoints_path");
+        this->declare_parameter("rviz_waypoints_topic");
+        this->get_parameter_or<std::string>("waypoints_path", waypoints_path, "/sim_ws/src/pure_pursuit/racelines/e7_floor5.csv");
+        this->get_parameter_or<std::string>("rviz_waypoints_topic", rviz_waypoints_topic, "/waypoints");
 
         vis_path_pub = this->create_publisher<visualization_msgs::msg::MarkerArray>(rviz_waypoints_topic, 1000);
-        timer_ = this->create_wall_timer(500ms, std::bind(&WaypointVisualiser::timer_callback, this));
+        timer_ = this->create_wall_timer(5000ms, std::bind(&WaypointVisualiser::timer_callback, this));
 
-        //initialise tf2 shared pointers
         RCLCPP_INFO (this->get_logger(), "this node has been launched");
-
         download_waypoints();
 
-        //copy all data once to data structure initialised before
     }
 
     private:
@@ -60,7 +48,8 @@ public:
 
 
     //topic names
-    std::string rviz_waypoints_topic = "/waypoints";
+    std::string waypoints_path;
+    std::string rviz_waypoints_topic;
     
     //file object
     std::fstream csvFile_waypoints; 
@@ -77,7 +66,7 @@ public:
     //private functions
     
     void download_waypoints () { //put all data in vectors
-        csvFile_waypoints.open(WAYPOINTS_PATH, std::ios::in);
+        csvFile_waypoints.open(waypoints_path, std::ios::in);
 
         RCLCPP_INFO (this->get_logger(), "%s", (csvFile_waypoints.is_open() ? "fileOpened" : "fileNOTopened"));
         
@@ -100,9 +89,6 @@ public:
                 RCLCPP_INFO (this->get_logger(), "%s", (word.empty() ? "wordempty" : "wordNOTempty"));
                 //RCLCPP_INFO (this->get_logger(), "%f", std::stod(word));
                 if (!word.empty()) {
-
-                    //row.push_back(word);
-
                     if (j == 0) {
                         double x = std::stod(word);
                         waypoints.X.push_back(x);
@@ -146,7 +132,6 @@ public:
     }
 
     void timer_callback () {
-
         visualize_points();
     }
     
