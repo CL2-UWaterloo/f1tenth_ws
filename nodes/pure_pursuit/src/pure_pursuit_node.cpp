@@ -1,70 +1,54 @@
-#include <memory> //for smart pointers
-//#include <chrono> //for time 
+#include <memory>
 #include <math.h>
 #include <string>
-#include <cstdlib> //for abs value function
-#include <vector> /// CHECK: might cause errors due to double header in linker
-#include <sstream> //for handling csv extraction
-#include <iostream> //both for input/output and file stream and handling
+#include <cstdlib> 
+#include <vector> 
+#include <sstream> 
+#include <iostream> 
 #include <fstream>
-#include <algorithm> //for max function
-
+#include <algorithm> 
 #include <Eigen/Eigen>
 
-
-//ROS related headers
 #include "rclcpp/rclcpp.hpp"
-//message header
 #include "nav_msgs/msg/odometry.hpp"
 #include "ackermann_msgs/msg/ackermann_drive_stamped.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "visualization_msgs/msg/marker.hpp"
 #include "visualization_msgs/msg/marker_array.hpp"
-//tf2 headers
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/buffer.h>
 #include <geometry_msgs/msg/transform_stamped.hpp>
-//#include <tf2/LinearMath/Matrix3x3.h>
-//#include <tf2/LinearMath/Quaternion.h>
 
-#define SIMULATION 1 // TO CHANGE TO 0 WHEN RUNNING THE CAR PHYSICALLY
 
 #define _USE_MATH_DEFINES
-#define USE_VARIABLE_LOOKAHEAD 0
-// #define MAX_LOOKAHEAD 2.0 // in meters
-#define MAX_LOOKAHEAD 1.0 // in meters, if you use the optimal raceline
-#define K_p 0.5
-#define STEERING_LIMIT 25 //degrees
-
-// #define FILENAME "waypoints_odom.csv"
-#define FILENAME "racelines/e7_floor5.csv"
-
-#if SIMULATION
-    #define WAYPOINTS_PATH "/sim_ws/src/pure_pursuit/src/" FILENAME
-    #define ODOM_TOPIC "/ego_racecar/odom";
-    #define CAR_REFFRAME "ego_racecar/base_link";
-#else
-    #define WAYPOINTS_PATH "/f1tenth_ws/src/pure_pursuit/src/" FILENAME
-    #define ODOM_TOPIC "/pf/pose/odom" // from running the particle filter https://github.com/f1tenth/particle_filter/blob/foxy-devel/particle_filter/particle_filter.py
-    #define CAR_REFFRAME "laser"; // TODO: Publish static transform from base_link to laser, this is not done automatically? 
-
-#endif
-//using namespaces 
-//used for bind (uncomment below)
 using std::placeholders::_1;
-//using namespace Eigen;
-//using namespace std; --> may need
-//using namespace std::chrono_literals;
-
 
 class PurePursuit : public rclcpp::Node {
 
 public:
     PurePursuit() : Node("pure_pursuit_node") {
         // initialise parameters
-        //set parameter during run time with: ros2 param set <node_name> <parameter_name> <value>
-        //set parameter during launch time with: -p :=
-
+        this->declare_parameter("waypoints_path");
+        this->declare_parameter("odom_topic");
+        this->declare_parameter("car_refFrame");
+        this->declare_parameter("drive_topic");
+        this->declare_parameter("rviz_waypointselected_topic");
+        this->declare_parameter("global_refFrame");
+        this->declare_parameter("max_lookahead");
+        this->declare_parameter("K_p");
+        this->declare_parameter("steering_limit");
+        
+        // Default Values
+        this->get_parameter_or<std::string>("waypoints_path", waypoints_path, "/sim_ws/src/pure_pursuit/racelines/e7_floor5.csv");
+        this->get_parameter_or<std::string>("odom_topic", odom_topic, "/ego_racecar/odom");
+        this->get_parameter_or<std::string>("car_refFrame", car_refFrame, "ego_racecar/base_link");
+        this->get_parameter_or<std::string>("drive_topic", drive_topic, "/drive");
+        this->get_parameter_or<std::string>("rviz_waypointselected_topic", rviz_waypointselected_topic, "/waypoint_selected");
+        this->get_parameter_or<std::string>("global_refFrame", global_refFrame, "map");
+        this->get_parameter_or<double>("max_lookahead", max_lookahead, 1.0);
+        this->get_parameter_or<double>("K_p", K_p, 0.5);
+        this->get_parameter_or<double>("steering_limit", steering_limit, 25.0);
+        
         //initialise subscriber sharedptr obj
         subscription_odom = this->create_subscription<nav_msgs::msg::Odometry>(odom_topic, 25, std::bind(&PurePursuit::odom_callback, this, _1));
 
@@ -81,13 +65,10 @@ public:
 
         download_waypoints();
 
-        //copy all data once to data structure initialised before
-
     }
 
     ~PurePursuit() {}
 
-    //EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 private:
     //global static (to be shared by all objects) and dynamic variables (each instance gets its own copy -> managed on the stack)
     struct csvFileData{
@@ -104,14 +85,15 @@ private:
     Eigen::Matrix3d rotation_m;
 
 
-    //topic names
-    std::string odom_topic = ODOM_TOPIC;
-    std::string car_refFrame = CAR_REFFRAME;
-    std::string drive_topic = "/drive";
-    std::string global_refFrame = "map"; //TODO: might have to add backslashes before
-    //std::string rviz_waypoints_topic = "/waypoints";
-    std::string rviz_waypointselected_topic = "/waypoints_selected";
-
+    std::string odom_topic;
+    std::string car_refFrame;
+    std::string drive_topic;
+    std::string global_refFrame;
+    std::string rviz_waypointselected_topic;
+    std::string waypoints_path;
+    double K_p;
+    double max_lookahead;
+    double steering_limit;
     
     //file object
     std::fstream csvFile_waypoints; 
@@ -149,10 +131,10 @@ private:
     }
 
     void download_waypoints () { //put all data in vectors
-        csvFile_waypoints.open(WAYPOINTS_PATH, std::ios::in);
+        csvFile_waypoints.open(waypoints_path, std::ios::in);
 
         if (!csvFile_waypoints.is_open()) {
-            RCLCPP_ERROR(this->get_logger(), "%s", "Cannot open CSV file!");
+            RCLCPP_ERROR(this->get_logger(), "Cannot Open CSV File: %s", waypoints_path);
             return;
         } else {
             RCLCPP_INFO(this->get_logger(), "CSV File Opened");
@@ -184,7 +166,7 @@ private:
 
         csvFile_waypoints.close();
         num_waypoints = waypoints.X.size();
-        RCLCPP_INFO(this->get_logger(), "Finished loading %d waypoints from %d", num_waypoints, WAYPOINTS_PATH);
+        RCLCPP_INFO(this->get_logger(), "Finished loading %d waypoints from %d", num_waypoints, waypoints_path);
         
         double average_dist_between_waypoints = 0.0;
         for (int i=0;i<num_waypoints-1;i++) {
@@ -221,18 +203,17 @@ private:
         int start = waypoints.index;
         int end = (waypoints.index + 500) % num_waypoints;
         
-        // TODO: Add dynamic lookahead distance based on velocity if the flag USE_VARIABLE_LOOKAHEAD is set
 
         if (end < start) { // Loop around
             for (int i=start; i<num_waypoints; i++) {
-                if (p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world) <= MAX_LOOKAHEAD 
+                if (p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world) <= max_lookahead 
                 && p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world) >= longest_distance) {
                     longest_distance = p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world);
                     final_i = i;
                 }
             }
             for (int i=0; i<end; i++) {
-                if (p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world) <= MAX_LOOKAHEAD 
+                if (p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world) <= max_lookahead 
                 && p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world) >= longest_distance) {
                     longest_distance = p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world);
                     final_i = i;
@@ -240,7 +221,7 @@ private:
             }
         } else {
             for (int i=start; i<end; i++) {
-                if (p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world) <= MAX_LOOKAHEAD 
+                if (p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world) <= max_lookahead 
                 && p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world) >= longest_distance) {
                     longest_distance = p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world);
                     final_i = i;
@@ -252,7 +233,7 @@ private:
         if (final_i == -1) { // if we haven't found anything, search from the beginning
             final_i = 0; // Temporarily assign to 0
             for (unsigned int i=0;i<waypoints.X.size(); i++) {
-                if (p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world) <= MAX_LOOKAHEAD 
+                if (p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world) <= max_lookahead 
                 && p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world) >= longest_distance) {
                     longest_distance = p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world);
                     final_i = i;
@@ -282,7 +263,6 @@ private:
     void transformandinterp_waypoint() { //pass old waypoint here
         //initialise vectors
         waypoints.p1_world << waypoints.X[waypoints.index], waypoints.Y[waypoints.index], 0.0;
-        //waypoints.p2_world << waypoints.X[waypoints.index+1], waypoints.Y[waypoints.index+1], 0.0;
 
         //rviz publish way point
         visualize_points(waypoints.p1_world);
@@ -304,10 +284,10 @@ private:
         waypoints.p1_car = (rotation_m*waypoints.p1_world) + translation_v;
     }
 
-    double p_controller(const nav_msgs::msg::Odometry::ConstSharedPtr odom_submsgObj) { // pass waypoint
+    double p_controller() { // pass waypoint
         /*
-        To design our P controller, we define our error term to be the angle the car needs to correct itself, e = theta = y/r.
-
+        To design our P controller, we define our error term to be the angle the car needs to correct itself, e = theta = y/r. This is not the perfect equation,
+        but it works. 
         Ideally, waypoints.p1_car(1) = 0, meaning we are aligned with our waypoint.
 
         */
@@ -320,30 +300,31 @@ private:
 
     double get_velocity(double steering_angle) {
         double velocity;
-        if (abs(steering_angle) >= to_radians(0.0) && abs(steering_angle) < to_radians(10.0)) {
-            velocity = 4.5; // If you want to go crazy
-            // velocity = 1.5;
-        } 
-        else if (abs(steering_angle) >= to_radians(10.0) && abs(steering_angle) <= to_radians(20.0)) {
-            velocity = 2.5;
-        } 
-        else {
-            velocity = 2.0;
-        }
         
         if (waypoints.V[waypoints.index]) { 
             velocity = waypoints.V[waypoints.index];
+        } else { // For waypoints without velocity profiles
+            if (abs(steering_angle) >= to_radians(0.0) && abs(steering_angle) < to_radians(10.0)) {
+                velocity = 4.5; // If you want to go crazy
+                // velocity = 1.5;
+            } 
+            else if (abs(steering_angle) >= to_radians(10.0) && abs(steering_angle) <= to_radians(20.0)) {
+                velocity = 2.5;
+            } 
+            else {
+                velocity = 2.0;
+            }
         }
-
+            
         return velocity;
     }
 
     void publish_message (double steering_angle) {
         auto drive_msgObj = ackermann_msgs::msg::AckermannDriveStamped();
         if (steering_angle < 0.0) {
-            drive_msgObj.drive.steering_angle = std::max(steering_angle, -to_radians(STEERING_LIMIT)); //ensure steering angle is dynamically capable
+            drive_msgObj.drive.steering_angle = std::max(steering_angle, -to_radians(steering_limit)); //ensure steering angle is dynamically capable
         } else {
-            drive_msgObj.drive.steering_angle = std::min(steering_angle, to_radians(STEERING_LIMIT)); //ensure steering angle is dynamically capable
+            drive_msgObj.drive.steering_angle = std::min(steering_angle, to_radians(steering_limit)); //ensure steering angle is dynamically capable
         }
 
         drive_msgObj.drive.speed = get_velocity(drive_msgObj.drive.steering_angle);
@@ -365,7 +346,7 @@ private:
 
         // Calculate curvature/steering angle
         //p controller
-        double steering_angle = p_controller(odom_submsgObj);
+        double steering_angle = p_controller();
 
         // TODO: publish drive message, don't forget to limit the steering angle.
         //publish object and message: AckermannDriveStamped on drive topic 

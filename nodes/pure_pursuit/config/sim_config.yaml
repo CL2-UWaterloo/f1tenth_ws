@@ -1,0 +1,18 @@
+pure_pursuit_node:
+  ros__parameters:
+    waypoints_path: "/sim_ws/src/pure_pursuit/racelines/e7_floor5.csv" 
+    odom_topic: "/ego_racecar/odom"
+    car_refFrame: "ego_racecar/base_link"
+    global_refFrame: "map"
+    drive_topic: "/drive"
+    rviz_waypointselected_topic: "/waypoint_selected"
+    
+    # Pure Pursuit Parameters
+    max_lookeahead: 1.0
+    K_p: 0.5
+    steering_limit: 25.0
+
+
+waypoint_visualiser_node:
+  ros__parameters:
+    waypoints_path: "/sim_ws/src/pure_pursuit/racelines/e7_floor5.csv" 
