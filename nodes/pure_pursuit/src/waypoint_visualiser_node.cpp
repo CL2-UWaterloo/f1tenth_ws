@@ -33,7 +33,7 @@ public:
         this->get_parameter_or<std::string>("rviz_waypoints_topic", rviz_waypoints_topic, "/waypoints");
 
         vis_path_pub = this->create_publisher<visualization_msgs::msg::MarkerArray>(rviz_waypoints_topic, 1000);
-        timer_ = this->create_wall_timer(5000ms, std::bind(&WaypointVisualiser::timer_callback, this));
+        timer_ = this->create_wall_timer(2000ms, std::bind(&WaypointVisualiser::timer_callback, this));
 
         RCLCPP_INFO (this->get_logger(), "this node has been launched");
         download_waypoints();

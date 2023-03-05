@@ -48,7 +48,7 @@ public:
         this->get_parameter_or<double>("max_lookahead", max_lookahead, 1.0);
         this->get_parameter_or<double>("K_p", K_p, 0.5);
         this->get_parameter_or<double>("steering_limit", steering_limit, 25.0);
-        this->get_parameter_or<double>("velocity_percentage", velocity_percentage, 1.0);
+        this->get_parameter_or<double>("velocity_percentage", velocity_percentage, 0.6);
         
         //initialise subscriber sharedptr obj
         subscription_odom = this->create_subscription<nav_msgs::msg::Odometry>(odom_topic, 25, std::bind(&PurePursuit::odom_callback, this, _1));
