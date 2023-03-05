@@ -2,7 +2,6 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 import os
-import yaml
 
 def generate_launch_description():
     ld = LaunchDescription()
@@ -12,8 +11,6 @@ def generate_launch_description():
         'config.yaml'
         )
 
-    # config_dict = yaml.safe_load(open(config, 'r'))
-    # file_path = config_dict['waypoint_visualizer_node']['ros__parameters']['waypoints_path']
     pure_pursuit_node = Node(
         package='pure_pursuit',
         executable='pure_pursuit_node',
