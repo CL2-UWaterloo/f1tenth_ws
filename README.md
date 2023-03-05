@@ -16,6 +16,8 @@ Other algorithms that are not used
 - [Scan matching](./nodes/scan_matching) $\rightarrow$ `nodes/scan_matching` (To be completed)
 
 # Running Simulation
+Simulation sometimes seems to crash using another launch file. Do `ros2 run` instead of `ros2 launch`.
+
 ### With an NVIDIA gpu
 You need **Docker**, **nvidia-docker2** and **rocker** and installed.
 

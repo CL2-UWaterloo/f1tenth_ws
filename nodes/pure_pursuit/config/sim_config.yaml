@@ -11,6 +11,7 @@ pure_pursuit_node:
     max_lookeahead: 1.0
     K_p: 0.5
     steering_limit: 25.0
+    velocity_percentage: 1.0
 
 
 waypoint_visualiser_node:

@@ -48,6 +48,7 @@ public:
         this->get_parameter_or<double>("max_lookahead", max_lookahead, 1.0);
         this->get_parameter_or<double>("K_p", K_p, 0.5);
         this->get_parameter_or<double>("steering_limit", steering_limit, 25.0);
+        this->get_parameter_or<double>("velocity_percentage", velocity_percentage, 1.0);
         
         //initialise subscriber sharedptr obj
         subscription_odom = this->create_subscription<nav_msgs::msg::Odometry>(odom_topic, 25, std::bind(&PurePursuit::odom_callback, this, _1));
@@ -94,6 +95,7 @@ private:
     double K_p;
     double max_lookahead;
     double steering_limit;
+    double velocity_percentage;
     
     //file object
     std::fstream csvFile_waypoints; 
@@ -302,7 +304,7 @@ private:
         double velocity;
         
         if (waypoints.V[waypoints.index]) { 
-            velocity = waypoints.V[waypoints.index];
+            velocity = waypoints.V[waypoints.index] * velocity_percentage;
         } else { // For waypoints without velocity profiles
             if (abs(steering_angle) >= to_radians(0.0) && abs(steering_angle) < to_radians(10.0)) {
                 velocity = 4.5; // If you want to go crazy

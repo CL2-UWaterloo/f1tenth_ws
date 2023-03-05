@@ -25,16 +25,8 @@ from nav_msgs.msg import OccupancyGrid
 from visualization_msgs.msg import Marker, MarkerArray
 from ackermann_msgs.msg import AckermannDriveStamped, AckermannDrive
 
-SIMULATION = True
-FILENAME = "racelines/e7_floor5.csv"
-
-if SIMULATION:
-    WAYPOINTS_PATH = "/sim_ws/src/pure_pursuit/src/" + FILENAME
-    ODOM_TOPIC = "/ego_racecar/odom"
-else:
-    WAYPOINTS_PATH = "/f1tenth_ws/src/pure_pursuit/src/" + FILENAME
-    ODOM_TOPIC = "/pf/pose/odom"
-
+WAYPOINTS_PATH = "/sim_ws/src/pure_pursuit/racelines/e7_floor5.csv"
+ODOM_TOPIC = "/ego_racecar/odom"
 
 class Vertex(object):
     def __init__(self, pos=None, parent=None):
@@ -53,7 +45,7 @@ class RRT(Node):
 
 
         self.pose_sub = self.create_subscription(Odometry, ODOM_TOPIC, self.pose_callback, 1)
-        self.scan_sub = self.create_subscription(LaserScan,  "/scan", self.scan_callback, 1)
+        self.scan_sub = self.create_subscription(LaserScan, "/scan", self.scan_callback, 1)
 
         # publishers
         self.waypoint_pub = self.create_publisher(Marker, "/waypoint_marker", 10)
@@ -561,6 +553,8 @@ class PurePursuit:
             file_path=filepath,
             segments=segments
         )
+        self.grid_width = 0.5
+        print(f"Loaded {len(self.waypoints)} waypoints")
 
     def transform_waypoints(self, waypoints, car_position, pose):
         # translation
@@ -589,9 +583,12 @@ class PurePursuit:
         distance = np.insert(distance, 0, 0) / distance[-1]
 
         # Interpolate
-        alpha = np.linspace(0, 1, segments)
-        interpolator = interp1d(distance, points, kind='slinear', axis=0)
-        interpolated_points = interpolator(alpha)
+        try: 
+            alpha = np.linspace(0, 1, segments)
+            interpolator = interp1d(distance, points, kind='slinear', axis=0)
+            interpolated_points = interpolator(alpha)
+        except:
+            interpolated_points = points
 
         # Add z-coordinate to be 0
         interpolated_points = np.hstack(

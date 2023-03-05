@@ -11,6 +11,7 @@ pure_pursuit_node:
     max_lookeahead: 1.0
     K_p: 0.5
     steering_limit: 25.0
+    velocity_percentage: 0.3 # To get the car to drive slower
 
 
 waypoint_visualiser_node:
