@@ -8,7 +8,7 @@ def generate_launch_description():
     config = os.path.join(
         get_package_share_directory('pure_pursuit'),
         'config',
-        'sim_config.yaml'
+        'config.yaml'
         )
 
     pure_pursuit_node = Node(
