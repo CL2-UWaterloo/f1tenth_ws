@@ -1,4 +1,8 @@
 rrt:
   ros__parameters:
-    waypoints_path:  "/sim_ws/src/pure_pursuit/racelines/e7_floor5.csv"
+    waypoints_path: "/sim_ws/src/rrt/racelines/e7_floor5.csv" 
     odom_topic:  "/ego_racecar/odom"
+    segments: 512
+    velocity_min: 1.5
+    velocity_max: 6.0
+    lookahead_distance: 3.0

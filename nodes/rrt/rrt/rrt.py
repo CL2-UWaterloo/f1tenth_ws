@@ -52,8 +52,6 @@ class RRT(Node):
         self.is_sim = True
         self.populate_free = True
 
-        
-
         self.pure_pursuit = PurePursuit(L=self.L, segments=self.segments, filepath=self.waypoints_path)
         self.get_logger().info(f"Loaded {len(self.pure_pursuit.waypoints)} waypoints")
         self.utils = Utils()
@@ -231,7 +229,6 @@ class RRT(Node):
 
         # convert path from grid to local coordinates
         path_local = [self.grid_to_local(point) for point in path_grid]
-        self.get_logger().info(f"Local Path: {path_local}")
         if len(path_local) < 2:
             return
 
@@ -257,7 +254,6 @@ class RRT(Node):
         # convert position to occupancy grid indices
         current_pos = self.local_to_grid(0, 0)
         goal_pos = self.local_to_grid(self.goal_pos[0], self.goal_pos[1])
-        self.get_logger().info(f"Running RRT, current_pos: {current_pos} goal_pos: {goal_pos}")
 
         # resample a close point if our goal point is occupied
         if self.occupancy_grid[goal_pos] == self.IS_OCCUPIED:
@@ -583,7 +579,7 @@ class PurePursuit:
 
     def interpolate_waypoints(self, file_path, segments):
         # Read waypoints from csv
-        points = np.genfromtxt(file_path, delimiter=",")[:, :2]
+        points = np.genfromtxt(file_path, delimiter=",")[:-2, :2] # Exclude last row, because that closes the loop
 
         # Add first point as last point to complete loop
         points = np.vstack((points, points[0]))
@@ -593,12 +589,9 @@ class PurePursuit:
         distance = np.insert(distance, 0, 0) / distance[-1]
 
         # Interpolate
-        try: 
-            alpha = np.linspace(0, 1, segments)
-            interpolator = interp1d(distance, points, kind='slinear', axis=0)
-            interpolated_points = interpolator(alpha)
-        except:
-            interpolated_points = points
+        alpha = np.linspace(0, 1, segments)
+        interpolator = interp1d(distance, points, kind='slinear', axis=0)
+        interpolated_points = interpolator(alpha)
 
         # Add z-coordinate to be 0
         interpolated_points = np.hstack(
