@@ -1,0 +1,4 @@
+rrt:
+  ros__parameters:
+    waypoints_path:  "/sim_ws/src/pure_pursuit/racelines/e7_floor5.csv"
+    odom_topic:  "/ego_racecar/odom"

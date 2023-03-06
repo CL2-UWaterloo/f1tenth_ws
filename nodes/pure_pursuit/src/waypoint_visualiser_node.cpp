@@ -27,10 +27,10 @@ class WaypointVisualiser : public rclcpp::Node {
 public:
     WaypointVisualiser() : Node("waypoint_visualiser_node")
     {
-        this->declare_parameter("waypoints_path");
-        this->declare_parameter("rviz_waypoints_topic");
-        this->get_parameter_or<std::string>("waypoints_path", waypoints_path, "/sim_ws/src/pure_pursuit/racelines/e7_floor5.csv");
-        this->get_parameter_or<std::string>("rviz_waypoints_topic", rviz_waypoints_topic, "/waypoints");
+        this->declare_parameter("waypoints_path", "/sim_ws/src/pure_pursuit/racelines/e7_floor5.csv");
+        this->declare_parameter("rviz_waypoints_topic", "/waypoints");
+        waypoints_path = this->get_parameter("waypoints_path").value_to_string();
+        rviz_waypoints_topic = this->get_parameter("rviz_waypoints_topic").value_to_string();
 
         vis_path_pub = this->create_publisher<visualization_msgs::msg::MarkerArray>(rviz_waypoints_topic, 1000);
         timer_ = this->create_wall_timer(2000ms, std::bind(&WaypointVisualiser::timer_callback, this));

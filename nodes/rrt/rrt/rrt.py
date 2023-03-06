@@ -6,7 +6,6 @@ Before you start, please read: https://arxiv.org/pdf/1105.1186.pdf
 
 import math
 import copy
-
 import numpy as np
 from scipy import signal
 from scipy.interpolate import interp1d
@@ -25,9 +24,6 @@ from nav_msgs.msg import OccupancyGrid
 from visualization_msgs.msg import Marker, MarkerArray
 from ackermann_msgs.msg import AckermannDriveStamped, AckermannDrive
 
-WAYPOINTS_PATH = "/sim_ws/src/pure_pursuit/racelines/e7_floor5.csv"
-ODOM_TOPIC = "/ego_racecar/odom"
-
 class Vertex(object):
     def __init__(self, pos=None, parent=None):
         self.pos = pos
@@ -36,15 +32,34 @@ class Vertex(object):
 
 class RRT(Node):
     def __init__(self):
-        super().__init__('rrt_node')
+        super().__init__('rrt')
 
-        # improt pure pursuit functions
-        self.L = 3
-        self.pure_pursuit = PurePursuit(L=self.L, segments=1024, filepath=WAYPOINTS_PATH)
+        self.declare_parameter('waypoints_path', '/f1tenth_ws/src/pure_pursuit/racelines/e7_floor5.csv')
+        self.declare_parameter('odom_topic', '/pf/pose/odom')
+        self.declare_parameter('lookahead_distance', 3.0)
+        self.declare_parameter('segments', 1024)
+        self.declare_parameter('velocity_min', 0.5)
+        self.declare_parameter('velocity_max', 2.0)
+        
+        self.waypoints_path = str(self.get_parameter('waypoints_path').value)
+        self.odom_topic = str(self.get_parameter('odom_topic').value)
+        self.L = float(self.get_parameter('lookahead_distance').value)
+        self.segments = int(self.get_parameter('segments').value)
+        self.velocity_min = float(self.get_parameter('velocity_min').value)
+        self.velocity_max = float(self.get_parameter('velocity_max').value)
+
+        # hyper-parameters
+        self.is_sim = True
+        self.populate_free = True
+
+        
+
+        self.pure_pursuit = PurePursuit(L=self.L, segments=self.segments, filepath=self.waypoints_path)
+        self.get_logger().info(f"Loaded {len(self.pure_pursuit.waypoints)} waypoints")
         self.utils = Utils()
 
 
-        self.pose_sub = self.create_subscription(Odometry, ODOM_TOPIC, self.pose_callback, 1)
+        self.pose_sub = self.create_subscription(Odometry, self.odom_topic, self.pose_callback, 1)
         self.scan_sub = self.create_subscription(LaserScan, "/scan", self.scan_callback, 1)
 
         # publishers
@@ -71,12 +86,6 @@ class RRT(Node):
         self.CELLS_PER_METER = 10 #hence, grid height in m = lookahead = 3
         self.CELL_Y_OFFSET = (self.grid_width // 2) - 1 #cartesian frame orientation same as that of car local ref frame.
         self.MAX_RRT_ITER = 100
-
-        # hyper-parameters
-        self.is_sim = True
-        self.velocity_min = 1.5
-        self.velocity_max = 5.0
-        self.populate_free = True
 
         # rrt variables
         self.path_world = []
@@ -222,7 +231,7 @@ class RRT(Node):
 
         # convert path from grid to local coordinates
         path_local = [self.grid_to_local(point) for point in path_grid]
-
+        self.get_logger().info(f"Local Path: {path_local}")
         if len(path_local) < 2:
             return
 
@@ -248,6 +257,7 @@ class RRT(Node):
         # convert position to occupancy grid indices
         current_pos = self.local_to_grid(0, 0)
         goal_pos = self.local_to_grid(self.goal_pos[0], self.goal_pos[1])
+        self.get_logger().info(f"Running RRT, current_pos: {current_pos} goal_pos: {goal_pos}")
 
         # resample a close point if our goal point is occupied
         if self.occupancy_grid[goal_pos] == self.IS_OCCUPIED:
@@ -547,7 +557,7 @@ class Utils:
 
 
 class PurePursuit:
-    def __init__(self, L=1.7, segments=1024, filepath=WAYPOINTS_PATH):
+    def __init__(self, L=1.7, segments=1024, filepath="/f1tenth_ws/src/rrt/racelines/e7_floor5.csv"):
         self.L = L
         self.waypoints = self.interpolate_waypoints(
             file_path=filepath,
