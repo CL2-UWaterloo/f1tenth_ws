@@ -25,15 +25,7 @@ def generate_launch_description():
         parameters=[config]
     )
 
-    rviz_node = Node(
-        package='rviz2',
-        executable='rviz2',
-        name='rviz',
-        arguments=['-d', os.path.join(get_package_share_directory('pure_pursuit'), 'launch', 'sim_pure_pursuit.rviz')]
-    )
-
     # finalize
-    ld.add_action(rviz_node)
     ld.add_action(pure_pursuit_node)
     ld.add_action(waypoint_visualizer_node)
 

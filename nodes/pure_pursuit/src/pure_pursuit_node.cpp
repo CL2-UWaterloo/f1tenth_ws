@@ -28,27 +28,28 @@ class PurePursuit : public rclcpp::Node {
 public:
     PurePursuit() : Node("pure_pursuit_node") {
         // initialise parameters
-        this->declare_parameter("waypoints_path");
-        this->declare_parameter("odom_topic");
-        this->declare_parameter("car_refFrame");
-        this->declare_parameter("drive_topic");
-        this->declare_parameter("rviz_waypointselected_topic");
-        this->declare_parameter("global_refFrame");
-        this->declare_parameter("max_lookahead");
-        this->declare_parameter("K_p");
-        this->declare_parameter("steering_limit");
+        this->declare_parameter("waypoints_path", "/sim_ws/src/pure_pursuit/racelines/e7_floor5.csv");
+        this->declare_parameter("odom_topic", "/ego_racecar/odom");
+        this->declare_parameter("car_refFrame", "ego_racecar/base_link");
+        this->declare_parameter("drive_topic", "/drive");
+        this->declare_parameter("rviz_waypointselected_topic", "/waypoints");
+        this->declare_parameter("global_refFrame", "map");
+        this->declare_parameter("max_lookahead", 1.0);
+        this->declare_parameter("K_p", 0.5);
+        this->declare_parameter("steering_limit", 25.0);
+        this->declare_parameter("velocity_percentage", 0.6);
         
         // Default Values
-        this->get_parameter_or<std::string>("waypoints_path", waypoints_path, "/sim_ws/src/pure_pursuit/racelines/e7_floor5.csv");
-        this->get_parameter_or<std::string>("odom_topic", odom_topic, "/ego_racecar/odom");
-        this->get_parameter_or<std::string>("car_refFrame", car_refFrame, "ego_racecar/base_link");
-        this->get_parameter_or<std::string>("drive_topic", drive_topic, "/drive");
-        this->get_parameter_or<std::string>("rviz_waypointselected_topic", rviz_waypointselected_topic, "/waypoint_selected");
-        this->get_parameter_or<std::string>("global_refFrame", global_refFrame, "map");
-        this->get_parameter_or<double>("max_lookahead", max_lookahead, 1.0);
-        this->get_parameter_or<double>("K_p", K_p, 0.5);
-        this->get_parameter_or<double>("steering_limit", steering_limit, 25.0);
-        this->get_parameter_or<double>("velocity_percentage", velocity_percentage, 0.6);
+        waypoints_path = this->get_parameter("waypoints_path").as_string();
+        odom_topic = this->get_parameter("odom_topic").as_string();
+        car_refFrame = this->get_parameter("car_refFrame").as_string();
+        drive_topic = this->get_parameter("drive_topic").as_string();
+        rviz_waypointselected_topic = this->get_parameter("rviz_waypointselected_topic").as_string();
+        global_refFrame = this->get_parameter("global_refFrame").as_string();
+        max_lookahead = this->get_parameter("max_lookahead").as_double();
+        K_p = this->get_parameter("K_p").as_double();
+        steering_limit =  this->get_parameter("steering_limit").as_double();
+        velocity_percentage =  this->get_parameter("velocity_percentage").as_double();
         
         //initialise subscriber sharedptr obj
         subscription_odom = this->create_subscription<nav_msgs::msg::Odometry>(odom_topic, 25, std::bind(&PurePursuit::odom_callback, this, _1));
