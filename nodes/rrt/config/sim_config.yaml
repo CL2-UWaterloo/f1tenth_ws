@@ -5,4 +5,6 @@ rrt:
     segments: 512
     velocity_min: 1.5
     velocity_max: 6.0
+    cells_per_meter: 10
     lookahead_distance: 3.0
+    is_sim: True

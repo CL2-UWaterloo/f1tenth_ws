@@ -1,4 +1,4 @@
-image: e7_floor3_biggest.pgm
+image: e7_floor5_biggest.pgm
 mode: trinary
 resolution: 0.05
 origin: [-50.1, -27.3, 0]

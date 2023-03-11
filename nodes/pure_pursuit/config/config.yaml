@@ -1,6 +1,6 @@
 pure_pursuit_node:
   ros__parameters:
-    waypoints_path: "/f1tenth_ws/src/pure_pursuit/racelines/e7_floor5.csv" 
+    waypoints_path: "/f1tenth_ws/src/pure_pursuit/racelines/e7_floor5_biggest.csv" 
     odom_topic: "/pf/pose/odom"
     car_refFrame: "laser"
     global_refFrame: "map"
@@ -8,12 +8,12 @@ pure_pursuit_node:
     rviz_waypointselected_topic: "/waypoint_selected"
     
     # Pure Pursuit Parameters
-    max_lookeahead: 1.0
+    max_lookeahead: 1.5
     K_p: 0.5
     steering_limit: 25.0
-    velocity_percentage: 0.5 # To get the car to drive slower
+    velocity_percentage: 0.2 # To get the car to drive slower
 
 
 waypoint_visualiser_node:
   ros__parameters:
-    waypoints_path: "/f1tenth_ws/src/pure_pursuit/racelines/e7_floor5.csv" 
+    waypoints_path: "/f1tenth_ws/src/pure_pursuit/racelines/e7_floor5_biggest.csv" 

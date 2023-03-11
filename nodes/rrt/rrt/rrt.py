@@ -40,6 +40,8 @@ class RRT(Node):
         self.declare_parameter('segments', 1024)
         self.declare_parameter('velocity_min', 0.5)
         self.declare_parameter('velocity_max', 2.0)
+        self.declare_parameter('cells_per_meter', 10)
+        self.declare_parameter('is_sim', False)
         
         self.waypoints_path = str(self.get_parameter('waypoints_path').value)
         self.odom_topic = str(self.get_parameter('odom_topic').value)
@@ -47,9 +49,11 @@ class RRT(Node):
         self.segments = int(self.get_parameter('segments').value)
         self.velocity_min = float(self.get_parameter('velocity_min').value)
         self.velocity_max = float(self.get_parameter('velocity_max').value)
+        self.CELLS_PER_METER = int(self.get_parameter('cells_per_meter').value)
+        self.is_sim = bool(self.get_parameter('is_sim').value)
+        
 
         # hyper-parameters
-        self.is_sim = True
         self.populate_free = True
 
         self.pure_pursuit = PurePursuit(L=self.L, segments=self.segments, filepath=self.waypoints_path)
@@ -67,12 +71,6 @@ class RRT(Node):
         self.drive_pub = self.create_publisher(AckermannDriveStamped, "/drive", 10)
         self.occupancy_grid_pub = self.create_publisher(OccupancyGrid, "/occupancy_grid", 10)
 
-        # class variables
-        self.grid_height = int(self.L * 10) #in number of cells
-        self.grid_width = int(60)
-        self.occupancy_grid = np.full(shape=(self.grid_height, self.grid_width), fill_value=-1, dtype=int)
-        self.current_pose = None
-        self.goal_pos = None
 
         # constants
         self.MAX_RANGE = self.L - 0.1
@@ -81,12 +79,18 @@ class RRT(Node):
         self.ANGLE_OFFSET = np.radians(45) #fov = 270. One side = fov/2 = 135. 135-45 = 90 (for occupancy grid)
         self.IS_OCCUPIED = 100
         self.IS_FREE = 0
-        self.CELLS_PER_METER = 10 #hence, grid height in m = lookahead = 3
-        self.CELL_Y_OFFSET = (self.grid_width // 2) - 1 #cartesian frame orientation same as that of car local ref frame.
         self.MAX_RRT_ITER = 100
 
+        # class variables
+        self.grid_height = int(self.L * self.CELLS_PER_METER) #in number of cells
+        self.grid_width = int(60)
+        self.CELL_Y_OFFSET = (self.grid_width // 2) - 1 #cartesian frame orientation same as that of car local ref frame.
+        self.occupancy_grid = np.full(shape=(self.grid_height, self.grid_width), fill_value=-1, dtype=int)
+        self.current_pose = None
+        self.goal_pos = None
         # rrt variables
         self.path_world = []
+
 
     def local_to_grid(self, x, y):
         i = int(x * -self.CELLS_PER_METER + (self.grid_height -1))
@@ -108,19 +112,20 @@ class RRT(Node):
             pose_msg (PoseStamped): incoming message from subscribed topic
         """
         # determine pose data type (sim vs. car)
-        pose = pose_msg.pose.pose if self.is_sim else pose_msg.pose
+        pose = pose_msg.pose.pose
 
         # save current car pose
         self.current_pose = copy.deepcopy(pose)
+        self.get_logger().info(f"{self.current_pose}")
 
         # obtain pure pursuit waypoint
         self.goal_pos, goal_pos_world = self.pure_pursuit.get_waypoint(pose)
-        # self.pure_pursuit.draw_marker(
-        #     pose_msg.header.frame_id,
-        #     pose_msg.header.stamp,
-        #     goal_pos_world,
-        #     self.waypoint_pub
-        # )
+        self.utils.draw_marker(
+            pose_msg.header.frame_id,
+            pose_msg.header.stamp,
+            goal_pos_world,
+            self.waypoint_pub
+        )
 
     def populate_occupancy_grid(self, ranges, angle_increment):
         """
@@ -229,6 +234,8 @@ class RRT(Node):
 
         # convert path from grid to local coordinates
         path_local = [self.grid_to_local(point) for point in path_grid]
+        
+        self.get_logger().info(f"Path: {path_local}")
         if len(path_local) < 2:
             return
 
@@ -448,7 +455,7 @@ class Utils:
         marker.scale.z = 0.2
         marker.color.a = 1.0
         marker.color.r = 1.0
-        marker.color.g = 1.0
+        marker.color.g = 0.0
         marker.color.b = 0.0
         marker.pose.position.x = position[0]
         marker.pose.position.y = position[1]
@@ -611,7 +618,6 @@ class PurePursuit:
 
         # get indices of waypoints that are within L, sorted by descending distance
         indices_L = np.argsort(np.where(distances < self.L, distances, -1))[::-1]
-        self.CELLS_PER_METER = 10
         self.CELL_Y_OFFSET = (self.grid_width // 2) - 1
 
         # set goal point to be the farthest valid waypoint within distance L
