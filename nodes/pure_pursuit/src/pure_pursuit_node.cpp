@@ -57,8 +57,8 @@ public:
         
         //initialise subscriber sharedptr obj
         subscription_odom = this->create_subscription<nav_msgs::msg::Odometry>(odom_topic, 25, std::bind(&PurePursuit::odom_callback, this, _1));
-        // Published from safety_node
-        subscription_ttc = this->create_subscription<std_msgs::msg::Bool>("/emergency_breaking", 25, std::bind(&PurePursuit::ttc_callback, this, _1)); 
+        // Published from safety_node, I get an error
+        // subscription_ttc = this->create_subscription<std_msgs::msg::Bool>("/emergency_breaking", 25, std::bind(&PurePursuit::ttc_callback, this, _1)); 
 
         //initialise publisher sharedptr obj
         publisher_drive = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>(drive_topic, 25);
@@ -260,10 +260,10 @@ private:
         
         // Find the closest point to the car, and use the velocity index for that
         double shortest_distance = p2pdist(waypoints.X[0], x_car_world, waypoints.Y[0], y_car_world);
-        velocity_i = 0;
+        int velocity_i = 0;
         for (int i=0; i<waypoints.X.size(); i++) {
             if (p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world) <= shortest_distance) {
-                shortest_velocity_distance = p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world);
+                shortest_distance = p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world);
                 velocity_i = i;
             }
         }
@@ -273,7 +273,6 @@ private:
         waypoints.velocity_index = velocity_i;
         RCLCPP_INFO(this->get_logger(), "waypoint index: %d ... distance: %.2f", waypoints.index, p2pdist(waypoints.X[waypoints.index], x_car_world, waypoints.Y[waypoints.index], y_car_world));
     }
-        RCLCPP_INFO(this->get_logger(), "waypoint x y : %.2f %.2f ", waypoints.p1_car(0), waypoints.p1_car(1));
 
     void quat_to_rot(double q0, double q1, double q2, double q3) { //w,x,y,z -> q0,q1,q2,q3
         double r00 = (double)(2.0 * (q0 * q0 + q1 * q1) - 1.0);
@@ -340,7 +339,7 @@ private:
             }
         }
 
-        if (emergency_breaking) velocity = 0.0;  // Do not move if you are about to run into a wall
+        // if (emergency_breaking) velocity = 0.0;  // Do not move if you are about to run into a wall
             
         return velocity;
     }
@@ -375,11 +374,10 @@ private:
         //publish object and message: AckermannDriveStamped on drive topic 
         publish_message(steering_angle);
     }
-    
-    void ttc_callback(const std_msgs::msg::Bool::ConstSharedPtr bool_submsgObj) {
-        emergency_breaking = bool_submsgjObj->data;
-    }
 
+    // void ttc_callback(const std_msgs::msg::Bool::ConstSharedPtr bool_submsgObj) {
+    //     emergency_breaking = bool_submsgObj->data;
+    // }
 };
 
 

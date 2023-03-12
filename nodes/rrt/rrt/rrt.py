@@ -15,14 +15,11 @@ import rclpy
 from rclpy.duration import Duration
 from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
-from geometry_msgs.msg import PoseStamped
-from geometry_msgs.msg import PointStamped
-from geometry_msgs.msg import Pose
 from geometry_msgs.msg import Point
 from nav_msgs.msg import Odometry
 from nav_msgs.msg import OccupancyGrid
 from visualization_msgs.msg import Marker, MarkerArray
-from ackermann_msgs.msg import AckermannDriveStamped, AckermannDrive
+from ackermann_msgs.msg import AckermannDriveStamped
 
 class Vertex(object):
     def __init__(self, pos=None, parent=None):
@@ -82,7 +79,7 @@ class RRT(Node):
         self.MAX_RRT_ITER = 100
 
         # class variables
-        self.grid_height = int(self.L * self.CELLS_PER_METER) #in number of cells
+        self.grid_height = int(self.L * self.CELLS_PER_METER) # in number of cells
         self.grid_width = int(60)
         self.CELL_Y_OFFSET = (self.grid_width // 2) - 1 #cartesian frame orientation same as that of car local ref frame.
         self.occupancy_grid = np.full(shape=(self.grid_height, self.grid_width), fill_value=-1, dtype=int)
@@ -103,13 +100,10 @@ class RRT(Node):
         y = (j - self.CELL_Y_OFFSET) / -self.CELLS_PER_METER
         return (x, y)
 
-    def pose_callback(self, pose_msg):
+    def pose_callback(self, pose_msg: Odometry):
         """
         The pose callback when subscribed to particle filter's inferred pose
         Here is where the main RRT loop happens
-
-        Args:
-            pose_msg (PoseStamped): incoming message from subscribed topic
         """
         # determine pose data type (sim vs. car)
         pose = pose_msg.pose.pose
@@ -139,9 +133,9 @@ class RRT(Node):
         self.occupancy_grid = np.full(shape=(self.grid_height, self.grid_width), fill_value=-1, dtype=int)
 
         # enumerate over lidar scans
-        for i, dist in enumerate(ranges):
+        for idx, dist in enumerate(ranges):
             # skip scans behind the car
-            theta = (i * angle_increment) - self.ANGLE_OFFSET
+            theta = (idx * angle_increment) - self.ANGLE_OFFSET
             if theta < self.MIN_ANGLE or theta > self.MAX_ANGLE:
                 continue
 
@@ -149,6 +143,9 @@ class RRT(Node):
             dist_clipped = np.clip(dist, 0, self.MAX_RANGE)
             x = dist_clipped * np.sin(theta)
             y = dist_clipped * np.cos(theta) * -1
+            if abs(x) > (self.grid_height / self.CELLS_PER_METER) or abs(y) > (self.grid_width / self.CELLS_PER_METER):
+                print(f"Invalid coordinates: ({x}, {y})")
+                continue
 
             # obtain grid indices from local coordinates of scan point
             i, j = self.local_to_grid(x, y)
@@ -471,11 +468,11 @@ class Utils:
             marker.id = i
             marker.type = marker.SPHERE
             marker.action = marker.ADD
-            marker.scale.x = 0.2
-            marker.scale.y = 0.2
-            marker.scale.z = 0.2
+            marker.scale.x = 0.3
+            marker.scale.y = 0.3
+            marker.scale.z = 0.3
             marker.color.a = 1.0
-            marker.color.r = 1.0
+            marker.color.r = 0.0
             marker.color.g = 1.0
             marker.color.b = 0.0
             marker.pose.position.x = position[0]
@@ -504,11 +501,11 @@ class Utils:
         line_list.id = 0
         line_list.type = line_list.LINE_LIST
         line_list.action = line_list.ADD
-        line_list.scale.x = 0.01
+        line_list.scale.x = 0.1
         line_list.color.a = 1.0
         line_list.color.r = 0.0
-        line_list.color.g = 0.0
-        line_list.color.b = 1.0
+        line_list.color.g = 1.0
+        line_list.color.b = 0.0
         line_list.points = points
         publisher.publish(line_list)
 

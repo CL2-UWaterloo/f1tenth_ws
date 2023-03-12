@@ -10,11 +10,11 @@ pure_pursuit_node:
     # Pure Pursuit Parameters
     # Lookahead is computed using the following: lookahead = min(max(min_lookahead, max_lookahead * curr_velocity / lookahead_ratio), max_lookahead); 
     min_lookahead: 0.5
-    max_lookahead: 4.0 # lookahead when the car is going around max velocity
+    max_lookahead: 3.0 # lookahead when the car is going around max velocity
     lookahead_ratio: 8.0 # approximately the max velocity
-    K_p: 0.5
+    K_p: 0.25
     steering_limit: 25.0
-    velocity_percentage: 0.7 # To get the car to drive slower/faster from the velocity profile
+    velocity_percentage: 0.92 # To get the car to drive slower/faster from the velocity profile
 
 
 waypoint_visualiser_node:
