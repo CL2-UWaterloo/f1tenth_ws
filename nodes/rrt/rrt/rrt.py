@@ -34,18 +34,22 @@ class RRT(Node):
         self.declare_parameter('waypoints_path', '/f1tenth_ws/src/pure_pursuit/racelines/e7_floor5.csv')
         self.declare_parameter('odom_topic', '/pf/pose/odom')
         self.declare_parameter('lookahead_distance', 3.0)
+        self.declare_parameter('K_p', 0.5)
         self.declare_parameter('segments', 1024)
         self.declare_parameter('velocity_min', 0.5)
         self.declare_parameter('velocity_max', 2.0)
+        self.declare_parameter('steering_limit', 25.0)
         self.declare_parameter('cells_per_meter', 10)
         self.declare_parameter('is_sim', False)
         
         self.waypoints_path = str(self.get_parameter('waypoints_path').value)
         self.odom_topic = str(self.get_parameter('odom_topic').value)
         self.L = float(self.get_parameter('lookahead_distance').value)
+        self.K_p = float(self.get_parameter('K_p').value)
         self.segments = int(self.get_parameter('segments').value)
         self.velocity_min = float(self.get_parameter('velocity_min').value)
         self.velocity_max = float(self.get_parameter('velocity_max').value)
+        self.steering_limit = float(self.get_parameter('steering_limit').value)
         self.CELLS_PER_METER = int(self.get_parameter('cells_per_meter').value)
         self.is_sim = bool(self.get_parameter('is_sim').value)
         
@@ -107,6 +111,8 @@ class RRT(Node):
         """
         # determine pose data type (sim vs. car)
         pose = pose_msg.pose.pose
+        self.current_velocity = np.sqrt(pose_msg.twist.twist.linear.x**2 +  pose_msg.twist.twist.linear.y**2)
+        # TODO: Implement dynamic lookahead
 
         # save current car pose
         self.current_pose = copy.deepcopy(pose)
@@ -193,12 +199,12 @@ class RRT(Node):
         # calculate curvature/steering angle
         L = np.linalg.norm(point)
         y = point[1]
-        angle = (2 * y) / (L**2)
-        angle = np.clip(angle, -0.5, 0.5)
+        angle = self.K_p * (2 * y) / (L**2)
+        angle = np.clip(angle, -np.radians(self.steering_limit), np.radians(self.steering_limit))
 
         # determine velocity
         logit = np.clip(
-            (2.0 / (1.0 + np.exp(-5 * (np.abs(np.degrees(angle)) / 20.0)))) - 1.0,
+            (2.0 / (1.0 + np.exp(-5 * (np.abs(np.degrees(angle)) / self.steering_limit)))) - 1.0,
             0.0,
             1.0
         )
@@ -557,7 +563,8 @@ class Utils:
 
 
 class PurePursuit:
-    def __init__(self, L=1.7, segments=1024, filepath="/f1tenth_ws/src/rrt/racelines/e7_floor5.csv"):
+    def __init__(self, L=1.7, segments=1024, filepath="/f1tenth_ws/src/rrt/racelines/e7_floor5.csv", K_p = 0.5):
+        # TODO: Make self.L a function of the current velocity, so we have more intelligent RRT
         self.L = L
         self.waypoints = self.interpolate_waypoints(
             file_path=filepath,
