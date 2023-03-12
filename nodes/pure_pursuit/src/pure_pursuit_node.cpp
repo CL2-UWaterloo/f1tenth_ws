@@ -34,7 +34,9 @@ public:
         this->declare_parameter("drive_topic", "/drive");
         this->declare_parameter("rviz_waypointselected_topic", "/waypoints");
         this->declare_parameter("global_refFrame", "map");
+        this->declare_parameter("min_lookahead", 0.5);
         this->declare_parameter("max_lookahead", 1.0);
+        this->declare_parameter("lookahead_ratio", 8.0);
         this->declare_parameter("K_p", 0.5);
         this->declare_parameter("steering_limit", 25.0);
         this->declare_parameter("velocity_percentage", 0.6);
@@ -46,13 +48,17 @@ public:
         drive_topic = this->get_parameter("drive_topic").as_string();
         rviz_waypointselected_topic = this->get_parameter("rviz_waypointselected_topic").as_string();
         global_refFrame = this->get_parameter("global_refFrame").as_string();
+        min_lookahead = this->get_parameter("min_lookahead").as_double();
         max_lookahead = this->get_parameter("max_lookahead").as_double();
+        lookahead_ratio = this->get_parameter("lookahead_ratio").as_double();
         K_p = this->get_parameter("K_p").as_double();
         steering_limit =  this->get_parameter("steering_limit").as_double();
         velocity_percentage =  this->get_parameter("velocity_percentage").as_double();
         
         //initialise subscriber sharedptr obj
         subscription_odom = this->create_subscription<nav_msgs::msg::Odometry>(odom_topic, 25, std::bind(&PurePursuit::odom_callback, this, _1));
+        // Published from safety_node
+        subscription_ttc = this->create_subscription<std_msgs::msg::Bool>("/emergency_breaking", 25, std::bind(&PurePursuit::ttc_callback, this, _1)); 
 
         //initialise publisher sharedptr obj
         publisher_drive = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>(drive_topic, 25);
@@ -79,6 +85,7 @@ private:
         std::vector<double> V;
         //double x_worldRef, y_worldRef, x_carRef, y_carRef;
         int index;
+        int velocity_index;
 
         Eigen::Vector3d p1_world; // Coordinate of point from world reference frame
         Eigen::Vector3d p1_car; // Coordinate of point from car reference frame (to be calculated)
@@ -94,9 +101,14 @@ private:
     std::string rviz_waypointselected_topic;
     std::string waypoints_path;
     double K_p;
+    double min_lookahead;
     double max_lookahead;
+    double lookahead_ratio;
     double steering_limit;
     double velocity_percentage;
+    double curr_velocity = 0.0;
+    
+    bool emergency_breaking = false;
     
     //file object
     std::fstream csvFile_waypoints; 
@@ -199,24 +211,26 @@ private:
     }
 
     void get_waypoint(double x_car_world, double y_car_world) {
-
         double longest_distance = 0;
         int final_i = -1;
         // Main logic: Search within the next 500 points
         int start = waypoints.index;
         int end = (waypoints.index + 500) % num_waypoints;
         
-
-        if (end < start) { // Loop around
+        // Lookahead needs to be between the min_lookhead and the max_lookahead
+        double lookahead = std::min(std::max(min_lookahead, max_lookahead * curr_velocity / lookahead_ratio), max_lookahead); 
+        
+        
+        if (end < start) { // If we need to loop around
             for (int i=start; i<num_waypoints; i++) {
-                if (p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world) <= max_lookahead 
+                if (p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world) <= lookahead 
                 && p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world) >= longest_distance) {
                     longest_distance = p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world);
                     final_i = i;
                 }
             }
             for (int i=0; i<end; i++) {
-                if (p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world) <= max_lookahead 
+                if (p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world) <= lookahead 
                 && p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world) >= longest_distance) {
                     longest_distance = p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world);
                     final_i = i;
@@ -224,7 +238,7 @@ private:
             }
         } else {
             for (int i=start; i<end; i++) {
-                if (p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world) <= max_lookahead 
+                if (p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world) <= lookahead 
                 && p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world) >= longest_distance) {
                     longest_distance = p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world);
                     final_i = i;
@@ -236,16 +250,30 @@ private:
         if (final_i == -1) { // if we haven't found anything, search from the beginning
             final_i = 0; // Temporarily assign to 0
             for (unsigned int i=0;i<waypoints.X.size(); i++) {
-                if (p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world) <= max_lookahead 
+                if (p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world) <= lookahead 
                 && p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world) >= longest_distance) {
                     longest_distance = p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world);
                     final_i = i;
                 }
             }
         }
-        waypoints.index = final_i; // If a waypoint is not found, then this temporarily sets it to 0. Allows us to look around the waypoints forever
-        RCLCPP_INFO(this->get_logger(), "waypoint index: %d ... distance: %f", waypoints.index, p2pdist(waypoints.X[waypoints.index], x_car_world, waypoints.Y[waypoints.index], y_car_world));
+        
+        // Find the closest point to the car, and use the velocity index for that
+        double shortest_distance = p2pdist(waypoints.X[0], x_car_world, waypoints.Y[0], y_car_world);
+        velocity_i = 0;
+        for (int i=0; i<waypoints.X.size(); i++) {
+            if (p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world) <= shortest_distance) {
+                shortest_velocity_distance = p2pdist(waypoints.X[i], x_car_world, waypoints.Y[i], y_car_world);
+                velocity_i = i;
+            }
+        }
+
+        // If a waypoint is not found within our radius, then waypoints.index = 0
+        waypoints.index = final_i; 
+        waypoints.velocity_index = velocity_i;
+        RCLCPP_INFO(this->get_logger(), "waypoint index: %d ... distance: %.2f", waypoints.index, p2pdist(waypoints.X[waypoints.index], x_car_world, waypoints.Y[waypoints.index], y_car_world));
     }
+        RCLCPP_INFO(this->get_logger(), "waypoint x y : %.2f %.2f ", waypoints.p1_car(0), waypoints.p1_car(1));
 
     void quat_to_rot(double q0, double q1, double q2, double q3) { //w,x,y,z -> q0,q1,q2,q3
         double r00 = (double)(2.0 * (q0 * q0 + q1 * q1) - 1.0);
@@ -288,15 +316,9 @@ private:
     }
 
     double p_controller() { // pass waypoint
-        /*
-        To design our P controller, we define our error term to be the angle the car needs to correct itself, e = theta = y/r. This is not the perfect equation,
-        but it works. 
-        Ideally, waypoints.p1_car(1) = 0, meaning we are aligned with our waypoint.
-
-        */
         double r = waypoints.p1_car.norm(); // r = sqrt(x^2 + y^2)
         double y = waypoints.p1_car(1);
-        double angle = K_p * asin(y / r);
+        double angle = K_p * 2 * y / pow(r, 2); // Calculated from https://docs.google.com/presentation/d/1jpnlQ7ysygTPCi8dmyZjooqzxNXWqMgO31ZhcOlKVOE/edit#slide=id.g63d5f5680f_0_33
 
         return angle;
     }
@@ -304,20 +326,21 @@ private:
     double get_velocity(double steering_angle) {
         double velocity;
         
-        if (waypoints.V[waypoints.index]) { 
-            velocity = waypoints.V[waypoints.index] * velocity_percentage;
-        } else { // For waypoints without velocity profiles
+        if (waypoints.V[waypoints.velocity_index]) { 
+            velocity = waypoints.V[waypoints.velocity_index] * velocity_percentage;
+        } else { // For waypoints loaded without velocity profiles
             if (abs(steering_angle) >= to_radians(0.0) && abs(steering_angle) < to_radians(10.0)) {
-                velocity = 4.5; // If you want to go crazy
-                // velocity = 1.5;
+                velocity = 6.0 * velocity_percentage; 
             } 
             else if (abs(steering_angle) >= to_radians(10.0) && abs(steering_angle) <= to_radians(20.0)) {
-                velocity = 2.5;
+                velocity = 2.5 * velocity_percentage;
             } 
             else {
-                velocity = 2.0;
+                velocity = 2.0 * velocity_percentage;
             }
         }
+
+        if (emergency_breaking) velocity = 0.0;  // Do not move if you are about to run into a wall
             
         return velocity;
     }
@@ -330,17 +353,16 @@ private:
             drive_msgObj.drive.steering_angle = std::min(steering_angle, to_radians(steering_limit)); //ensure steering angle is dynamically capable
         }
 
-        drive_msgObj.drive.speed = get_velocity(drive_msgObj.drive.steering_angle);
+        curr_velocity = get_velocity(drive_msgObj.drive.steering_angle);
+        drive_msgObj.drive.speed = curr_velocity;
 
         publisher_drive->publish(drive_msgObj);
-        RCLCPP_INFO(this->get_logger(), "waypoint x y : %f %f ", waypoints.p1_car(0), waypoints.p1_car(1));
-        RCLCPP_INFO (this->get_logger(), "Speed: %f ..... Steering Angle: %f", drive_msgObj.drive.speed, to_degrees(drive_msgObj.drive.steering_angle));
+        RCLCPP_INFO (this->get_logger(), "Speed: %.2f ..... Steering Angle: %.2f", drive_msgObj.drive.speed, to_degrees(drive_msgObj.drive.steering_angle));
     }
 
     void odom_callback(const nav_msgs::msg::Odometry::ConstSharedPtr odom_submsgObj) {
         double x_car_world = odom_submsgObj->pose.pose.position.x;
         double y_car_world = odom_submsgObj->pose.pose.position.y;
-        // TODO: find the current waypoint to track using methods mentioned in lecture
         // interpolate between different way-points 
         get_waypoint(x_car_world, y_car_world);
 
@@ -348,12 +370,14 @@ private:
         transformandinterp_waypoint();
 
         // Calculate curvature/steering angle
-        //p controller
         double steering_angle = p_controller();
 
-        // TODO: publish drive message, don't forget to limit the steering angle.
         //publish object and message: AckermannDriveStamped on drive topic 
         publish_message(steering_angle);
+    }
+    
+    void ttc_callback(const std_msgs::msg::Bool::ConstSharedPtr bool_submsgObj) {
+        emergency_breaking = bool_submsgjObj->data;
     }
 
 };

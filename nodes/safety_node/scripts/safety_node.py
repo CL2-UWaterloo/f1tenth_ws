@@ -5,6 +5,7 @@ from rclpy.node import Node
 import numpy as np
 # TODO: include needed ROS msg type headers and libraries
 from sensor_msgs.msg import LaserScan
+from std_msgs.msg import Bool
 from nav_msgs.msg import Odometry
 from ackermann_msgs.msg import AckermannDriveStamped, AckermannDrive
 
@@ -37,13 +38,15 @@ class SafetyNode(Node):
 
         self.odom_subscription = self.create_subscription(
             Odometry,
-            'ego_racecar/odom',
+            '/odom', # this is more reliable than /pf/pose/odom
             self.odom_callback,
             10
         )
         
         # Update the speed of the car
         self.publisher_ = self.create_publisher(AckermannDriveStamped, 'drive', 1000)
+        self.teleop_publisher_ = self.create_publisher(AckermannDriveStamped, 'teleop', 1000)
+        self.bool_publisher_ = self.create_publisher(Bool, 'emergency_breaking', 1000)
 
     def odom_callback(self, odom_msg):
         # Update current speed
@@ -59,13 +62,18 @@ class SafetyNode(Node):
                 emergency_breaking = True
                 break
 
+        emergency_msg = Bool()
+        emergency_msg.data = emergency_breaking
         
         # Publish command to brake
         if emergency_breaking:
             drive_msg = AckermannDriveStamped()
             drive_msg.drive.speed = 0.0
             self.get_logger().info("emergency brake engaged at speed {}".format(self.speed)) # Output to Log
-            self.publisher_.publish(drive_msg)
+            self.publisher_.publish(drive_msg) # for autonomous control
+            self.teleop_publisher_.publish(drive_msg) # for manual control
+        
+        self.bool_publisher_.publish(emergency_msg)
 
 def main(args=None):
     rclpy.init(args=args)
