@@ -3,6 +3,8 @@ This a repository that contains ready-to-run autonomous racing packages for the 
 
 Below is a demo of the car running the code from this repository in the E7 building at the University of Waterloo at a top speed of ~25km/h, record on March 13th 2023.
 
+https://user-images.githubusercontent.com/43485866/226077068-774f02dd-bc90-4eb6-96f8-d0ba284538ad.mp4
+
 
 ## Software Stack Overview
 **Our current software stack consists of**
