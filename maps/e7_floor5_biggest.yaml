@@ -1,7 +1,0 @@
-image: e7_floor5_biggest.pgm
-mode: trinary
-resolution: 0.05
-origin: [-50.1, -27.3, 0]
-negate: 0
-occupied_thresh: 0.65
-free_thresh: 0.25

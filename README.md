@@ -1,115 +1,51 @@
-# F1TENTH Autonomous Racing Research
-This a repository for doing autonomous racing research running on [F1TENTH](https://f1tenth.org/). Forked from [f1tenth_gym_ros](https://github.com/f1tenth/f1tenth_gym_ros). 
+# f1tenth_ws
+This a repository that contains ready-to-run autonomous racing packages for the [F1TENTH](https://f1tenth.org/) on ROS2 Foxy. It can be directly be deployed on the physical car. We've also included launch and config files for the [simulation environment](https://github.com/f1tenth/f1tenth_gym_ros), which uses slightly different topics for odometry.
 
-The original repository is purely a simulation environment for F1TENTH autonomous racing, without any other ROS2 packages to run code on. This forked repository contains multiple implementations to do autonomous racing (mainly solutions to [F1TENTH Labs](https://github.com/f1tenth/f1tenth_labs)):
+Below is a demo of the car running the code from this repository in the E7 building at the University of Waterloo at a top speed of ~25km/h, record on March 13th 2023.
 
-Currently Used Algorithms:
-- [Waypoint Generator](./nodes/waypoint_generator/) for generating waypoints $\rightarrow$ `nodes/waypoint_generator`
-	- Soon to be replaced with automatic raceline generation
-- [Pure Pursuit](./nodes/pure_pursuit/) for waypoint following $\rightarrow$ `nodes/pure_pursuit`
-- [Particle Filter](./nodes/particle_filter/) for localization $\rightarrow$ `nodes/particle_filter`
-- [RRT](./nodes/rrt) for obstacle avoidance $\rightarrow$ `nodes/rrt` 
-- [slam_toolbox](https://github.com/SteveMacenski/slam_toolbox) for mapping
+<video src="assets/racing.mp4" controls></video>
 
-Other algorithms that are not used
-- A [PID controller](./nodes/wall_follow/) to follow walls $\rightarrow$ `nodes/wall_follow`
-- [Scan matching](./nodes/scan_matching) $\rightarrow$ `nodes/scan_matching` (To be completed)
+## Software Stack Overview
+**Our current software stack consists of**
+- [slam_toolbox](https://github.com/SteveMacenski/slam_toolbox) for **mapping** (reference the following [slides](https://docs.google.com/presentation/d/1DP2F9l-yHe9gQobk2CzYduk6KR5QtDCp7sLsxqR2fag/edit#slide=id.g115c48c178d_0_1) for running it on the physical car)
+- [Particle Filter](./src/particle_filter/) for **localization** $\rightarrow$ `src/particle_filter`
+- [Pure Pursuit](./src/pure_pursuit/) for **waypoint following** (planning + control) $\rightarrow$ `src/pure_pursuit`
+- [RRT](./src/rrt) for a pure pursuit algorithm that includes **dynamic obstacle avoidance** (slightly slower) $\rightarrow$ `src/rrt`
 
-# Running Simulation
-Simulation sometimes seems to crash using another launch file. Do `ros2 run` instead of `ros2 launch`.
+Racing lines are generated through the [Cl2-UWaterloo/Raceline-Optimization](https://github.com/CL2-UWaterloo/Raceline-Optimization) repository.
 
-### With an NVIDIA gpu
-You need **Docker**, **nvidia-docker2** and **rocker** and installed.
+**Other algorithms that are not used, but are in this repository include**
+- [Waypoint Generator](./src/waypoint_generator/) for manually generating waypoints in simulation $\rightarrow$ `src/waypoint_generator` (this has been replaced with a script that automatically generates optimal racelines given a map)
+- A [PID controller](./src/wall_follow/) for staying at a constant distance to the wall $\rightarrow$ `src/wall_follow`
+- [Scan matching](./src/scan_matching) $\rightarrow$ `src/scan_matching` (To be completed)
+- [gap_follow](./src/gap_follow) $\rightarrow$ `src/gap_follow` (To be completed)
 
-1. Clone this repo
-2. Build the docker image by running:
-```bash
-docker build -t f1tenth_gym_ros -f Dockerfile .
+## High-Level Usage Guide
+These are the high level steps followed to get the F1TENTH driving in a new location:
+
+1. Run SLAM on the physical car to generate a map with `slam_toolbox`
+2. Clean up map in Photoshop, and generate a racing line using the [Cl2-UWaterloo/Raceline-Optimization](https://github.com/CL2-UWaterloo/Raceline-Optimization) repository.
+3. Store the racing lines under `src/pure_pursuit/racelines/` and `src/rrt/racelines/` (for dynamic obstacle avoidance)
+4. Run `particle_filter` with the new map to localize the car properly
+5. Run `pure_pursuit` or `rrt` to follow the racing line. Make sure to incrementally increase the `velocity_profile` inside the [config.yaml](./src/pure_pursuit/config/config.yaml) file.
+
+You can consult these accompanying notes: <https://stevengong.co/notes/F1TENTH-Field-Usage>, which shows every command used to get code working the physical car. Note that they are mainly written for our own personal reference, so the paths will be different in your setup.
+
+If you feel confused / stuck by all of this, you might want to start with following the [F1TENTH Course](https://docs.google.com/spreadsheets/d/1kAd0bf6nc1OVi_4IP1P3-H6PPU97hLjqW8d0mTLCsxg/edit#gid=29915317), where they actually teach why these algorithms are needed, and how they are implemented. The [official documentation](https://f1tenth.readthedocs.io/en/foxy_test/) describes how to setup the hardware and basic software for the car.
+
+## Running Simulation
+If you want to run these nodes inside the simulation environment, you need to clone the [simulation repository](https://github.com/f1tenth/f1tenth_gym_ros). Then, you should mount this repository's packages to the `docker-compose.yml` file:
+
 ```
-3. To run the containerized environment, start a docker container by running the following. (example showned here with nvidia-docker support). By running this, the current directory that you're in (should be `f1tenth_gym_ros`) is mounted in the container at `/sim_ws/src/f1tenth_gym_ros`. Which means that the changes you make in the repo on the host system will also reflect in the container.
-```bash
-sudo rocker --nvidia --x11 --volume .:/sim_ws/src/f1tenth_gym_ros ./nodes:/sim_ws/src/ -- f1tenth_gym_ros
+- INSERT_PATH_HERE/f1tenth_ws/src:/sim_ws/src
 ```
 
-### Without an NVIDIA gpu
-You need **Docker** installed.
+Each package can then be built inside the simulation environment.
 
-1. Clone this repo 
-2. Build the docker image by:
-```bash
-docker build -t f1tenth_gym_ros -f Dockerfile .
-```
-3. Bringup the novnc container and the sim container with docker-compose:
-```bash
-docker-compose up
-``` 
-4. In a separate terminal, run the following, and you'll have the a bash session in the simulation container. `tmux` is available for convenience.
-```bash
-docker exec -it f1tenth-autonomous-racing-research-sim-1 /bin/bash
-```
-5. In your browser, navigate to [http://localhost:8081/vnc.html](http://localhost:8081/vnc.html), you should see the noVNC logo with the connect button. Click the connect button to connect to the session.
+## Next Steps
+**A non-exhaustive list of things we want to do in the future, include**
 
+- Running SLAM + pure pursuit on the fly, without having to do the offline computation. Something like [this](https://www.youtube.com/watch?v=aCDPwZZm9C4&ab_channel=AMZFormulaStudent) would be incredible
 
-
-# Launching the Simulation
-1. `tmux` is included in the contianer, so you can create multiple bash sessions in the same terminal.
-2. To launch the simulation, make sure you source both the ROS2 setup script and the local workspace setup script. Run the following in the bash session from the container:
-```bash
-source /opt/ros/foxy/setup.bash
-source install/local_setup.bash
-ros2 launch f1tenth_gym_ros gym_bridge_launch.py
-```
-A rviz window should pop up showing the simulation either on your host system or in the browser window depending on the display forwarding you chose.
-
-You can then run another node by creating another bash session in `tmux`.
-
-# Configuring the simulation
-- The configuration file for the simulation is at `f1tenth_gym_ros/config/sim.yaml`.
-- Topic names and namespaces can be configured but is recommended to leave uncahnged.
-- The map can be changed via the `map_path` parameter. You'll have to use the full path to the map file in the container. The map follows the ROS convention. It is assumed that the image file and the `yaml` file for the map are in the same directory with the same name. See the note below about mounting a volume to see where to put your map file.
-- The `num_agent` parameter can be changed to either 1 or 2 for single or two agent racing.
-- The ego and opponent starting pose can also be changed via parameters, these are in the global map coordinate frame.
-
-The entire directory of the repo is mounted to a workspace `/sim_ws/src` as a package. All changes made in the repo on the host system will also reflect in the container. After changing the configuration, run `colcon build` again in the container workspace to make sure the changes are reflected.
-
-# Topics published by the simulation
-
-In **single** agent:
-
-- `/scan`: The ego agent's laser scan
-- `/ego_racecar/odom`: The ego agent's odometry
-- `/map`: The map of the environment
-
-A `tf` tree is also maintained.
-
-In **two** agents:
-
-In addition to the topics available in the single agent scenario, these topics are also available:
-
-- `/opp_scan`: The opponent agent's laser scan
-- `/ego_racecar/opp_odom`: The opponent agent's odometry for the ego agent's planner
-- `/opp_racecar/odom`: The opponent agents' odometry
-- `/opp_racecar/opp_odom`: The ego agent's odometry for the opponent agent's planner
-
-# Topics subscribed by the simulation
-
-In **single** agent:
-
-- `/drive`: The ego agent's drive command via `AckermannDriveStamped` messages
-- `/initalpose`: This is the topic for resetting the ego's pose via RViz's 2D Pose Estimate tool. Do **NOT** publish directly to this topic unless you know what you're doing.
-
-TODO: kb teleop topics
-
-In **two** agents:
-
-In addition to all topics in the single agent scenario, these topics are also available:
-
-- `/opp_drive`: The opponent agent's drive command via `AckermannDriveStamped` messages
-- `/goal_pose`: This is the topic for resetting the opponent agent's pose via RViz's 2D Goal Pose tool. Do **NOT** publish directly to this topic unless you know what you're doing.
-
-# Keyboard Teleop
-The keyboard teleop node from `teleop_twist_keyboard` is also installed as part of the simulation's dependency. To enable keyboard teleop, set `kb_teleop` to `True` in `sim.yaml`. After launching the simulation, in another terminal, run:
-```bash
-ros2 run teleop_twist_keyboard teleop_twist_keyboard
-```
-Then, press `i` to move forward, `u` and `o` to move forward and turn, `,` to move backwards, `m` and `.` to move backwards and turn, and `k` to stop in the terminal window running the teleop node.
+## About Us
+The Control, Learning and Logic (CL2) group at the University of Waterloo works on reseearch that aims to develop methods for reliable decision-making of autonomous systems in the wild, led by professor Yash Vardhan Pant. Current members working on the F1TENTH is composed of Steven Gong, Oluwatofolafun Damilola Opeoluwa-Calebs, and Soham Lakhi.

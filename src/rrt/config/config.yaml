@@ -1,0 +1,20 @@
+rrt:
+  ros__parameters:
+    waypoints_path: "/f1tenth_ws/src/rrt/racelines/e7_floor5.csv" 
+    odom_topic:  "/pf/pose/odom"
+  # segments = Number of points to interpolate to. The bigger the map, the more the number of segments
+  # TODO: Make this automatically infer?
+    segments: 1024 
+    K_p: 1.0
+    velocity_min: 1.5
+    velocity_max: 3.0
+    steering_limit: 25.0
+    cells_per_meter: 10
+    lookahead_distance: 3.0
+
+    # Idea taken from Pure Pursuit
+    # Lookahead is computed using the following: lookahead = min(max(min_lookahead, max_lookahead * curr_velocity / lookahead_ratio), max_lookahead); 
+    min_lookahead: 0.5
+    max_lookahead: 3.0 # lookahead when the car is going around max velocity
+    lookahead_ratio: 8.0 # approximately the max velocity
+    is_sim: False
