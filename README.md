@@ -49,4 +49,4 @@ Each package can then be built inside the simulation environment.
 - Running SLAM + pure pursuit on the fly, without having to do the offline computation. Something like [this](https://www.youtube.com/watch?v=aCDPwZZm9C4&ab_channel=AMZFormulaStudent) would be incredible
 
 ## About Us
-The Control, Learning and Logic (CL2) group at the University of Waterloo works on reseearch that aims to develop methods for reliable decision-making of autonomous systems in the wild, led by professor Yash Vardhan Pant. Current members working on the F1TENTH is composed of Steven Gong, Oluwatofolafun Damilola Opeoluwa-Calebs, and Soham Lakhi.
+The Control, Learning and Logic (CL2) group at the University of Waterloo works on research that aims to develop methods for reliable decision-making of autonomous systems in the wild, led by professor Yash Vardhan Pant. Current members working on the F1TENTH is composed of Steven Gong, Oluwatofolafun Damilola Opeoluwa-Calebs, and Soham Lakhi.
