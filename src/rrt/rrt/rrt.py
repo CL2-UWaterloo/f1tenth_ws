@@ -31,8 +31,10 @@ class RRT(Node):
     def __init__(self):
         super().__init__('rrt')
 
-        self.declare_parameter('waypoints_path', '/f1tenth_ws/src/pure_pursuit/racelines/e7_floor5.csv')
-        self.declare_parameter('odom_topic', '/pf/pose/odom')
+        self.declare_parameter('waypoints_path', '/sim_ws/src/pure_pursuit/racelines/e7_floor5.csv')
+        self.declare_parameter('scan_topic', '/scan')
+        self.declare_parameter('odom_topic', '/ego_racecar/odom')
+        self.declare_parameter('drive_topic', '/drive')
         self.declare_parameter('lookahead_distance', 3.0)
         self.declare_parameter('K_p', 0.5)
         self.declare_parameter('segments', 1024)
@@ -43,7 +45,9 @@ class RRT(Node):
         self.declare_parameter('is_sim', False)
         
         self.waypoints_path = str(self.get_parameter('waypoints_path').value)
+        self.scan_topic = str(self.get_parameter('scan_topic').value)
         self.odom_topic = str(self.get_parameter('odom_topic').value)
+        self.drive_topic = str(self.get_parameter('drive_topic').value)
         self.L = float(self.get_parameter('lookahead_distance').value)
         self.K_p = float(self.get_parameter('K_p').value)
         self.segments = int(self.get_parameter('segments').value)
@@ -63,13 +67,15 @@ class RRT(Node):
 
 
         self.pose_sub = self.create_subscription(Odometry, self.odom_topic, self.pose_callback, 1)
-        self.scan_sub = self.create_subscription(LaserScan, "/scan", self.scan_callback, 1)
+        self.scan_sub = self.create_subscription(LaserScan, self.scan_topic, self.scan_callback, 1)
 
         # publishers
+        self.create_timer(1.0, self.timer_callback)
+
         self.waypoint_pub = self.create_publisher(Marker, "/waypoint_marker", 10)
         self.rrt_path_pub = self.create_publisher(Marker, "/rrt_path", 10)
         self.rrt_node_pub = self.create_publisher(MarkerArray, "/rrt_node_array", 10)
-        self.drive_pub = self.create_publisher(AckermannDriveStamped, "/drive", 10)
+        self.drive_pub = self.create_publisher(AckermannDriveStamped, self.drive_topic, 10)
         self.occupancy_grid_pub = self.create_publisher(OccupancyGrid, "/occupancy_grid", 10)
 
 
@@ -91,6 +97,17 @@ class RRT(Node):
         self.goal_pos = None
         # rrt variables
         self.path_world = []
+
+    def timer_callback(self):
+        self.waypoints_path = str(self.get_parameter('waypoints_path').value)
+        self.L = float(self.get_parameter('lookahead_distance').value)
+        self.K_p = float(self.get_parameter('K_p').value)
+        self.segments = int(self.get_parameter('segments').value)
+        self.velocity_min = float(self.get_parameter('velocity_min').value)
+        self.velocity_max = float(self.get_parameter('velocity_max').value)
+        self.steering_limit = float(self.get_parameter('steering_limit').value)
+        self.CELLS_PER_METER = int(self.get_parameter('cells_per_meter').value)
+        self.is_sim = bool(self.get_parameter('is_sim').value)
 
 
     def local_to_grid(self, x, y):
@@ -214,6 +231,7 @@ class RRT(Node):
         drive_msg = AckermannDriveStamped()
         drive_msg.drive.speed          = velocity
         drive_msg.drive.steering_angle = angle
+        self.get_logger().info(f"Publishing drive message: {drive_msg}")
         self.drive_pub.publish(drive_msg)
 
     def scan_callback(self, scan_msg):
