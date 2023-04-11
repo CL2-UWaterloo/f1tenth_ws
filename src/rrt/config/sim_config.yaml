@@ -27,6 +27,12 @@ opp_rrt:
     scan_topic: "/opp_scan"
     odom_topic: "/opp_racecar/odom"
     drive_topic: "/opp_drive"
+
+    waypoint_marker_topic: "/opp_waypoint_marker"
+    rrt_path_topic: "/opp_rrt_path"
+    rrt_node_array_topic: "/opp_rrt_node_array"
+    occupancy_grid_topic: "/opp_occupancy_grid"
+
   # segments = Number of points to interpolate to. The bigger the map, the more the number of segments
   # TODO: Make this automatically infer?
     segments: 1024 

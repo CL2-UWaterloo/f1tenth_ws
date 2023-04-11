@@ -35,6 +35,11 @@ class RRT(Node):
         self.declare_parameter('scan_topic', '/scan')
         self.declare_parameter('odom_topic', '/ego_racecar/odom')
         self.declare_parameter('drive_topic', '/drive')
+        self.declare_parameter('waypoint_marker_topic', '/waypoint_marker')
+        self.declare_parameter('rrt_path_topic', '/rrt_path')
+        self.declare_parameter('rrt_node_array_topic', '/rrt_node_array')
+        self.declare_parameter('occupancy_grid_topic', '/occupancy_grid')
+
         self.declare_parameter('lookahead_distance', 3.0)
         self.declare_parameter('K_p', 0.5)
         self.declare_parameter('segments', 1024)
@@ -48,6 +53,10 @@ class RRT(Node):
         self.scan_topic = str(self.get_parameter('scan_topic').value)
         self.odom_topic = str(self.get_parameter('odom_topic').value)
         self.drive_topic = str(self.get_parameter('drive_topic').value)
+        self.waypoint_marker_topic = str(self.get_parameter('waypoint_marker_topic').value)
+        self.rrt_path_topic = str(self.get_parameter('rrt_path_topic').value)
+        self.rrt_node_array_topic = str(self.get_parameter('rrt_node_array_topic').value)
+        self.occupancy_grid_topic = str(self.get_parameter('occupancy_grid_topic').value)
         self.L = float(self.get_parameter('lookahead_distance').value)
         self.K_p = float(self.get_parameter('K_p').value)
         self.segments = int(self.get_parameter('segments').value)
@@ -72,11 +81,11 @@ class RRT(Node):
         # publishers
         self.create_timer(1.0, self.timer_callback)
 
-        self.waypoint_pub = self.create_publisher(Marker, "/waypoint_marker", 10)
-        self.rrt_path_pub = self.create_publisher(Marker, "/rrt_path", 10)
-        self.rrt_node_pub = self.create_publisher(MarkerArray, "/rrt_node_array", 10)
         self.drive_pub = self.create_publisher(AckermannDriveStamped, self.drive_topic, 10)
-        self.occupancy_grid_pub = self.create_publisher(OccupancyGrid, "/occupancy_grid", 10)
+        self.waypoint_pub = self.create_publisher(Marker, self.waypoint_marker_topic, 10)
+        self.rrt_path_pub = self.create_publisher(Marker, self.rrt_path_topic, 10)
+        self.rrt_node_pub = self.create_publisher(MarkerArray, self.rrt_node_array_topic, 10)
+        self.occupancy_grid_pub = self.create_publisher(OccupancyGrid, self.occupancy_grid_topic, 10)
 
 
         # constants
