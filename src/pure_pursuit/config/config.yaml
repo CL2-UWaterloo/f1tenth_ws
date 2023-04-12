@@ -1,6 +1,6 @@
 pure_pursuit_node:
   ros__parameters:
-    waypoints_path: "/f1tenth_ws/src/pure_pursuit/racelines/e7_floor5.csv" 
+    waypoints_path: "/f1tenth_ws/src/pure_pursuit/racelines/e7_floor5_biggest.csv" 
     odom_topic: "/pf/pose/odom"
     car_refFrame: "laser"
     global_refFrame: "map"
@@ -9,14 +9,16 @@ pure_pursuit_node:
     
     # Pure Pursuit Parameters
     # Lookahead is computed using the following: lookahead = min(max(min_lookahead, max_lookahead * curr_velocity / lookahead_ratio), max_lookahead); 
-    min_lookahead: 0.5
+    # min_lookahead: 0.5 # for square track
+    min_lookahead: 1.0
     max_lookahead: 3.0 # lookahead when the car is going around max velocity
     lookahead_ratio: 8.0 # approximately the max velocity
-    K_p: 0.25
+    # K_p: 0.25 # for square track
+    K_p: 0.15 # for big track
     steering_limit: 25.0
-    velocity_percentage: 0.96 # the limit, can only do 1 lap with clean tires
+    velocity_percentage: 0.8 # the limit, can only do 1 lap with clean tires
 
 
 waypoint_visualiser_node:
   ros__parameters:
-    waypoints_path: "/f1tenth_ws/src/pure_pursuit/racelines/e7_floor5.csv" 
+    waypoints_path: "/f1tenth_ws/src/pure_pursuit/racelines/e7_floor5_biggest.csv" 
