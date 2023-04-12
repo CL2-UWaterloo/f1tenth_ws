@@ -8,7 +8,7 @@
 #include <fstream>
 #include <algorithm> 
 #include <Eigen/Eigen>
-
+#include <chrono>
 #include "rclcpp/rclcpp.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "ackermann_msgs/msg/ackermann_drive_stamped.hpp"
@@ -22,6 +22,7 @@
 
 #define _USE_MATH_DEFINES
 using std::placeholders::_1;
+using namespace std::chrono_literals;
 
 class PurePursuit : public rclcpp::Node {
 
@@ -57,8 +58,7 @@ public:
         
         //initialise subscriber sharedptr obj
         subscription_odom = this->create_subscription<nav_msgs::msg::Odometry>(odom_topic, 25, std::bind(&PurePursuit::odom_callback, this, _1));
-        // Published from safety_node, I get an error
-        // subscription_ttc = this->create_subscription<std_msgs::msg::Bool>("/emergency_breaking", 25, std::bind(&PurePursuit::ttc_callback, this, _1)); 
+        timer_ = this->create_wall_timer(2000ms, std::bind(&PurePursuit::timer_callback, this));
 
         //initialise publisher sharedptr obj
         publisher_drive = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>(drive_topic, 25);
@@ -92,6 +92,9 @@ private:
     };
 
     Eigen::Matrix3d rotation_m;
+    
+    double x_car_world;
+    double y_car_world;
 
 
     std::string odom_topic;
@@ -109,6 +112,8 @@ private:
     double curr_velocity = 0.0;
     
     bool emergency_breaking = false;
+    std::string current_lane = "left"; // left or right lane
+    
     
     //file object
     std::fstream csvFile_waypoints; 
@@ -117,6 +122,9 @@ private:
     csvFileData waypoints;
     int num_waypoints;
 
+    //Timer initialisation
+    rclcpp::TimerBase::SharedPtr timer_;
+
     //declare subscriber sharedpointer obj
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr subscription_odom;
 
@@ -124,6 +132,7 @@ private:
     rclcpp::Publisher<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr publisher_drive; 
     //rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr vis_path_pub; 
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr vis_point_pub; 
+
 
     //declare tf shared pointers
     std::shared_ptr<tf2_ros::TransformListener> transform_listener_{nullptr};
@@ -197,9 +206,9 @@ private:
         marker.header.stamp = rclcpp::Clock().now();
         marker.type = visualization_msgs::msg::Marker::SPHERE;
         marker.action = visualization_msgs::msg::Marker::ADD;
-        marker.scale.x = 0.15;
-        marker.scale.y = 0.15;
-        marker.scale.z = 0.15;
+        marker.scale.x = 0.25;
+        marker.scale.y = 0.25;
+        marker.scale.z = 0.25;
         marker.color.a = 1.0; 
         marker.color.r = 1.0;
 
@@ -210,7 +219,7 @@ private:
 
     }
 
-    void get_waypoint(double x_car_world, double y_car_world) {
+    void get_waypoint() {
         double longest_distance = 0;
         int final_i = -1;
         // Main logic: Search within the next 500 points
@@ -271,7 +280,21 @@ private:
         // If a waypoint is not found within our radius, then waypoints.index = 0
         waypoints.index = final_i; 
         waypoints.velocity_index = velocity_i;
-        RCLCPP_INFO(this->get_logger(), "waypoint index: %d ... distance: %.2f", waypoints.index, p2pdist(waypoints.X[waypoints.index], x_car_world, waypoints.Y[waypoints.index], y_car_world));
+    }
+    
+    void get_waypoint_obstacle_avoidance() {
+        /*
+        TO CONSIDER: Edge cases where there are walls. The thing with RRT 
+        
+        1. Fetch next coordinate for the current lane
+        2. Run local occupancy grid, and check if there is anything on the current path. If not, RETURN coordinate
+        3. Change lane, and then run step 1 again. 
+        
+        This is where 
+
+        
+        
+        */
     }
 
     void quat_to_rot(double q0, double q1, double q2, double q3) { //w,x,y,z -> q0,q1,q2,q3
@@ -355,15 +378,18 @@ private:
         curr_velocity = get_velocity(drive_msgObj.drive.steering_angle);
         drive_msgObj.drive.speed = curr_velocity;
 
+        RCLCPP_INFO(this->get_logger(), "index: %d ... distance: %.2fm ... Speed: %.2fm/s ... Steering Angle: %.2f ... K_p: %.2f ... velocity_percentage: %.2f", waypoints.index, p2pdist(waypoints.X[waypoints.index], x_car_world, waypoints.Y[waypoints.index], y_car_world), drive_msgObj.drive.speed, to_degrees(drive_msgObj.drive.steering_angle), K_p, velocity_percentage);
+
         publisher_drive->publish(drive_msgObj);
-        RCLCPP_INFO (this->get_logger(), "Speed: %.2f ..... Steering Angle: %.2f", drive_msgObj.drive.speed, to_degrees(drive_msgObj.drive.steering_angle));
     }
 
     void odom_callback(const nav_msgs::msg::Odometry::ConstSharedPtr odom_submsgObj) {
-        double x_car_world = odom_submsgObj->pose.pose.position.x;
-        double y_car_world = odom_submsgObj->pose.pose.position.y;
+        x_car_world = odom_submsgObj->pose.pose.position.x;
+        y_car_world = odom_submsgObj->pose.pose.position.y;
         // interpolate between different way-points 
-        get_waypoint(x_car_world, y_car_world);
+        get_waypoint();
+        // Lane switching implementation
+        get_waypoint_obstacle_avoidance();
 
         //use tf2 transform the goal point 
         transformandinterp_waypoint();
@@ -374,10 +400,12 @@ private:
         //publish object and message: AckermannDriveStamped on drive topic 
         publish_message(steering_angle);
     }
-
-    // void ttc_callback(const std_msgs::msg::Bool::ConstSharedPtr bool_submsgObj) {
-    //     emergency_breaking = bool_submsgObj->data;
-    // }
+    
+    void timer_callback () {
+        // Periodically check parameters and update
+        K_p = this->get_parameter("K_p").as_double();
+        velocity_percentage = this->get_parameter("velocity_percentage").as_double();
+    }
 };
 
 
