@@ -1,3 +1,7 @@
+/*
+Pure Pursuit Implementation in C++. Includes features such as dynamic lookahead. Does not have waypoint 
+interpolation yet. 
+*/
 #include <memory>
 #include <math.h>
 #include <string>
@@ -33,7 +37,8 @@ public:
         this->declare_parameter("odom_topic", "/ego_racecar/odom");
         this->declare_parameter("car_refFrame", "ego_racecar/base_link");
         this->declare_parameter("drive_topic", "/drive");
-        this->declare_parameter("rviz_waypointselected_topic", "/waypoints");
+        this->declare_parameter("rviz_current_waypoint_topic", "/current_waypoint");
+        this->declare_parameter("rviz_lookahead_waypoint_topic", "/lookahead_waypoint");
         this->declare_parameter("global_refFrame", "map");
         this->declare_parameter("min_lookahead", 0.5);
         this->declare_parameter("max_lookahead", 1.0);
@@ -47,7 +52,8 @@ public:
         odom_topic = this->get_parameter("odom_topic").as_string();
         car_refFrame = this->get_parameter("car_refFrame").as_string();
         drive_topic = this->get_parameter("drive_topic").as_string();
-        rviz_waypointselected_topic = this->get_parameter("rviz_waypointselected_topic").as_string();
+        rviz_current_waypoint_topic = this->get_parameter("rviz_current_waypoint_topic").as_string();
+        rviz_lookahead_waypoint_topic = this->get_parameter("rviz_lookahead_waypoint_topic").as_string();
         global_refFrame = this->get_parameter("global_refFrame").as_string();
         min_lookahead = this->get_parameter("min_lookahead").as_double();
         max_lookahead = this->get_parameter("max_lookahead").as_double();
@@ -63,7 +69,8 @@ public:
         //initialise publisher sharedptr obj
         publisher_drive = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>(drive_topic, 25);
         //vis_path_pub = this->create_publisher<visualization_msgs::msg::MarkerArray>(rviz_waypoints_topic, 1000);
-        vis_point_pub = this->create_publisher<visualization_msgs::msg::Marker>(rviz_waypointselected_topic, 10);
+        vis_current_point_pub = this->create_publisher<visualization_msgs::msg::Marker>(rviz_current_waypoint_topic, 10);
+        vis_lookahead_point_pub = this->create_publisher<visualization_msgs::msg::Marker>(rviz_lookahead_waypoint_topic, 10);
 
         //initialise tf2 shared pointers
         tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
@@ -83,12 +90,13 @@ private:
         std::vector<double> X;
         std::vector<double> Y;
         std::vector<double> V;
-        //double x_worldRef, y_worldRef, x_carRef, y_carRef;
+
         int index;
         int velocity_index;
 
-        Eigen::Vector3d p1_world; // Coordinate of point from world reference frame
-        Eigen::Vector3d p1_car; // Coordinate of point from car reference frame (to be calculated)
+        Eigen::Vector3d lookahead_point_world; // from world reference frame (usually `map`)
+        Eigen::Vector3d lookahead_point_car; // from car reference frame
+        Eigen::Vector3d current_point_world; // Locks on to the closest waypoint, which gives a velocity profile
     };
 
     Eigen::Matrix3d rotation_m;
@@ -101,7 +109,8 @@ private:
     std::string car_refFrame;
     std::string drive_topic;
     std::string global_refFrame;
-    std::string rviz_waypointselected_topic;
+    std::string rviz_current_waypoint_topic;
+    std::string rviz_lookahead_waypoint_topic;
     std::string waypoints_path;
     double K_p;
     double min_lookahead;
@@ -130,8 +139,9 @@ private:
 
     //declare publisher sharedpointer obj
     rclcpp::Publisher<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr publisher_drive; 
-    //rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr vis_path_pub; 
-    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr vis_point_pub; 
+
+    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr vis_current_point_pub; 
+    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr vis_lookahead_point_pub; 
 
 
     //declare tf shared pointers
@@ -200,7 +210,7 @@ private:
         RCLCPP_INFO(this->get_logger(), "Average distance between waypoints: %f", average_dist_between_waypoints);
     }
 
-    void visualize_points(Eigen::Vector3d &point) {
+    void visualize_lookahead_point(Eigen::Vector3d &point) {
         auto marker = visualization_msgs::msg::Marker();
         marker.header.frame_id = "map";
         marker.header.stamp = rclcpp::Clock().now();
@@ -215,8 +225,25 @@ private:
         marker.pose.position.x = point(0);
         marker.pose.position.y = point(1);
         marker.id = 1;
-        vis_point_pub->publish(marker);
+        vis_lookahead_point_pub->publish(marker);
+    }
 
+    void visualize_current_point(Eigen::Vector3d &point) {
+        auto marker = visualization_msgs::msg::Marker();
+        marker.header.frame_id = "map";
+        marker.header.stamp = rclcpp::Clock().now();
+        marker.type = visualization_msgs::msg::Marker::SPHERE;
+        marker.action = visualization_msgs::msg::Marker::ADD;
+        marker.scale.x = 0.25;
+        marker.scale.y = 0.25;
+        marker.scale.z = 0.25;
+        marker.color.a = 1.0; 
+        marker.color.b = 1.0;
+
+        marker.pose.position.x = point(0);
+        marker.pose.position.y = point(1);
+        marker.id = 1;
+        vis_current_point_pub->publish(marker);
     }
 
     void get_waypoint() {
@@ -227,6 +254,8 @@ private:
         int end = (waypoints.index + 500) % num_waypoints;
         
         // Lookahead needs to be between the min_lookhead and the max_lookahead
+        // Set lookahead based on target velocity instead of current velocity? This will provide stronger guarantees.
+        // double lookahead = std::min(std::max(min_lookahead, max_lookahead * waypoints.V[waypoints.velocity_index] / lookahead_ratio), max_lookahead); 
         double lookahead = std::min(std::max(min_lookahead, max_lookahead * curr_velocity / lookahead_ratio), max_lookahead); 
         
         
@@ -282,21 +311,6 @@ private:
         waypoints.velocity_index = velocity_i;
     }
     
-    void get_waypoint_obstacle_avoidance() {
-        /*
-        TO CONSIDER: Edge cases where there are walls. The thing with RRT 
-        
-        1. Fetch next coordinate for the current lane
-        2. Run local occupancy grid, and check if there is anything on the current path. If not, RETURN coordinate
-        3. Change lane, and then run step 1 again. 
-        
-        This is where 
-
-        
-        
-        */
-    }
-
     void quat_to_rot(double q0, double q1, double q2, double q3) { //w,x,y,z -> q0,q1,q2,q3
         double r00 = (double)(2.0 * (q0 * q0 + q1 * q1) - 1.0);
         double r01 = (double)(2.0 * (q1 * q2 - q0 * q3));
@@ -315,10 +329,13 @@ private:
 
     void transformandinterp_waypoint() { //pass old waypoint here
         //initialise vectors
-        waypoints.p1_world << waypoints.X[waypoints.index], waypoints.Y[waypoints.index], 0.0;
+        waypoints.lookahead_point_world << waypoints.X[waypoints.index], waypoints.Y[waypoints.index], 0.0;
+        // x_car_world, y_car_world should have very similar values
+        waypoints.current_point_world << waypoints.X[waypoints.velocity_index], waypoints.Y[waypoints.velocity_index], 0.0; 
 
         //rviz publish way point
-        visualize_points(waypoints.p1_world);
+        visualize_lookahead_point(waypoints.lookahead_point_world);
+        visualize_current_point(waypoints.current_point_world);
         //look up transformation at that instant from tf_buffer_
         geometry_msgs::msg::TransformStamped transformStamped;
         
@@ -334,12 +351,12 @@ private:
         Eigen::Vector3d translation_v(transformStamped.transform.translation.x, transformStamped.transform.translation.y, transformStamped.transform.translation.z);
         quat_to_rot(transformStamped.transform.rotation.w, transformStamped.transform.rotation.x, transformStamped.transform.rotation.y, transformStamped.transform.rotation.z);
 
-        waypoints.p1_car = (rotation_m*waypoints.p1_world) + translation_v;
+        waypoints.lookahead_point_car = (rotation_m*waypoints.lookahead_point_world) + translation_v;
     }
 
     double p_controller() { // pass waypoint
-        double r = waypoints.p1_car.norm(); // r = sqrt(x^2 + y^2)
-        double y = waypoints.p1_car(1);
+        double r = waypoints.lookahead_point_car.norm(); // r = sqrt(x^2 + y^2)
+        double y = waypoints.lookahead_point_car(1);
         double angle = K_p * 2 * y / pow(r, 2); // Calculated from https://docs.google.com/presentation/d/1jpnlQ7ysygTPCi8dmyZjooqzxNXWqMgO31ZhcOlKVOE/edit#slide=id.g63d5f5680f_0_33
 
         return angle;
@@ -348,8 +365,8 @@ private:
     double get_velocity(double steering_angle) {
         double velocity;
         
-        if (waypoints.V[waypoints.index]) {  // I find better results using .index vs. .velocity_index
-            velocity = waypoints.V[waypoints.index] * velocity_percentage;
+        if (waypoints.V[waypoints.velocity_index]) {
+            velocity = waypoints.V[waypoints.velocity_index] * velocity_percentage;
         } else { // For waypoints loaded without velocity profiles
             if (abs(steering_angle) >= to_radians(0.0) && abs(steering_angle) < to_radians(10.0)) {
                 velocity = 6.0 * velocity_percentage; 
@@ -388,8 +405,6 @@ private:
         y_car_world = odom_submsgObj->pose.pose.position.y;
         // interpolate between different way-points 
         get_waypoint();
-        // Lane switching implementation
-        get_waypoint_obstacle_avoidance();
 
         //use tf2 transform the goal point 
         transformandinterp_waypoint();
@@ -405,6 +420,10 @@ private:
         // Periodically check parameters and update
         K_p = this->get_parameter("K_p").as_double();
         velocity_percentage = this->get_parameter("velocity_percentage").as_double();
+        min_lookahead = this->get_parameter("min_lookahead").as_double();
+        max_lookahead = this->get_parameter("max_lookahead").as_double();
+        lookahead_ratio = this->get_parameter("lookahead_ratio").as_double();
+        steering_limit =  this->get_parameter("steering_limit").as_double();
     }
 };
 

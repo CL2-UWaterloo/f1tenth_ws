@@ -5,12 +5,13 @@ pure_pursuit_node:
     car_refFrame: "laser"
     global_refFrame: "map"
     drive_topic: "/drive"
-    rviz_waypointselected_topic: "/waypoint_selected"
+    rviz_current_waypoint_topic: "/current_waypoint"
+    rviz_lookahead_waypoint_topic: "/lookahead_waypoint"
     
     # Pure Pursuit Parameters
     # Lookahead is computed using the following: lookahead = min(max(min_lookahead, max_lookahead * curr_velocity / lookahead_ratio), max_lookahead); 
     # min_lookahead: 0.5 # for square track
-    min_lookahead: 1.0
+    min_lookahead: 1.0 # for larger track
     max_lookahead: 3.0 # lookahead when the car is going around max velocity
     lookahead_ratio: 8.0 # approximately the max velocity
     # K_p: 0.25 # for square track
