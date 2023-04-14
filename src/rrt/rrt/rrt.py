@@ -140,6 +140,13 @@ class RRT(Node):
         i = int(x * -self.CELLS_PER_METER + (self.grid_height -1))
         j = int(y * -self.CELLS_PER_METER + self.CELL_Y_OFFSET)
         return (i, j)
+    
+    def local_to_grid_parallel(self, x,y):
+        i = np.round(x * -self.CELLS_PER_METER + (self.grid_height -1)).astype(int)
+        j = np.round(y * -self.CELLS_PER_METER + self.CELL_Y_OFFSET).astype(int)
+        return i,j
+
+
 
     def grid_to_local(self, point):
         i, j = point[0], point[1]
@@ -176,7 +183,6 @@ class RRT(Node):
             color="red"
         )
 
-
     def populate_occupancy_grid(self, ranges, angle_increment):
         """
         Populate occupancy grid using lidar scans and save
@@ -186,37 +192,30 @@ class RRT(Node):
             scan_msg (LaserScan): message from lidar scan topic
         """
         # reset empty occupacny grid (-1 = unknown)
-        self.occupancy_grid = np.full(shape=(self.grid_height, self.grid_width), fill_value=-1, dtype=int)
+        self.occupancy_grid = np.full(shape=(self.grid_height, self.grid_width), fill_value=self.IS_FREE, dtype=int)
 
-        # enumerate over lidar scans
-        for idx, dist in enumerate(ranges):
-            # skip scans behind the car
-            theta = (idx * angle_increment) - self.ANGLE_OFFSET
-            if theta < self.MIN_ANGLE or theta > self.MAX_ANGLE:
-                continue
+        ranges = np.array(ranges)
+        indices = np.arange(len(ranges))
+        thetas = (indices * angle_increment) - self.ANGLE_OFFSET
+        xs = ranges* np.sin(thetas)
+        ys = ranges* np.cos(thetas) * -1
+        
+        i, j = self.local_to_grid_parallel(xs, ys)
+        
+        occupied_indices = np.where(
+            (i >= 0) & (i < self.grid_height) & 
+            (j >= 0) & (j < self.grid_width)
+        )
+        
+        self.occupancy_grid[i[occupied_indices], j[occupied_indices]] = self.IS_OCCUPIED
 
-            # obtain local coordinate of scan
-            dist_clipped = np.clip(dist, 0, self.MAX_RANGE)
-            x = dist_clipped * np.sin(theta)
-            y = dist_clipped * np.cos(theta) * -1
-            if abs(x) > (self.grid_height / self.CELLS_PER_METER) or abs(y) > (self.grid_width / self.CELLS_PER_METER):
-                print(f"Invalid coordinates: ({x}, {y})")
-                continue
-
-            # obtain grid indices from local coordinates of scan point
-            i, j = self.local_to_grid(x, y)
-
-            # set occupied space
-            if dist < self.MAX_RANGE:
-                self.occupancy_grid[i, j] = self.IS_OCCUPIED
-
-            #TODO: read up on fast voxel traverse (as compared to flood fill)
-            # set free space by fast voxel traverse
-            if self.populate_free:
-                free_cells = self.utils.traverse_grid(self.local_to_grid(0, 0), (i, j))
-                for cell in free_cells:
-                    if self.occupancy_grid[cell] != self.IS_OCCUPIED:
-                        self.occupancy_grid[cell] = self.IS_FREE
+        #     #TODO: read up on fast voxel traverse (as compared to flood fill)
+        #     # set free space by fast voxel traverse
+        #     if self.populate_free:
+        #         free_cells = self.utils.traverse_grid(self.local_to_grid(0, 0), (i, j))
+        #         for cell in free_cells:
+        #             if self.occupancy_grid[cell] != self.IS_OCCUPIED:
+        #                 self.occupancy_grid[cell] = self.IS_FREE
 
     # NYI
     def publish_occupancy_grid(self, frame_id, stamp):

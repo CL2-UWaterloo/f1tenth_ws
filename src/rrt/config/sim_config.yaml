@@ -1,13 +1,12 @@
 ego_rrt:
   ros__parameters:
-    # waypoints_path: "/sim_ws/src/rrt/racelines/e7_floor5_square.csv" 
-    waypoints_path: "/home/stevengong/f1tenth_ws/src/pure_pursuit/racelines/e7_floor5_square.csv" 
+    waypoints_path: "/sim_ws/src/pure_pursuit/racelines/e7_floor5_square.csv" 
     scan_topic: "/scan"
     odom_topic: "/ego_racecar/odom"
     drive_topic: "/drive"
 
     segments: 0 # 0 means do not do interpolation
-    velocity_percentage: 0.5
+    velocity_percentage: 1.0
 
     K_p: 0.5
     min_lookahead: 1.0 # for larger track
@@ -22,8 +21,7 @@ ego_rrt:
 
 opp_rrt:
   ros__parameters:
-    # waypoints_path: "/sim_ws/src/rrt/racelines/e7_floor5.csv" 
-    waypoints_path: "/home/stevengong/f1tenth_ws/src/pure_pursuit/racelines/e7_floor5_square.csv" 
+    waypoints_path: "/sim_ws/src/pure_pursuit/racelines/e7_floor5_square.csv" 
     scan_topic: "/opp_scan"
     odom_topic: "/opp_racecar/odom"
     drive_topic: "/opp_drive"
@@ -44,4 +42,4 @@ opp_rrt:
 
 waypoint_visualiser_node:
   ros__parameters:
-    waypoints_path: "/home/stevengong/f1tenth_ws/src/pure_pursuit/racelines/e7_floor5_square.csv" 
+    waypoints_path: "/sim_ws/src/rrt/racelines/e7_floor5.csv" 
