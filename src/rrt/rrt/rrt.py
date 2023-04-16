@@ -10,6 +10,7 @@ import numpy as np
 from scipy import signal
 from scipy.interpolate import interp1d
 from scipy.spatial.transform import Rotation as R
+from collections import deque
 
 import rclpy
 from rclpy.duration import Duration
@@ -78,8 +79,6 @@ class RRT(Node):
         lookahead_ratio = float(self.get_parameter('lookahead_ratio').value)
 
         # hyper-parameters
-        self.populate_free = True
-
         self.pure_pursuit = PurePursuit(node=self, L=self.L, segments=self.segments, filepath=self.waypoints_world_path, min_lookahead=min_lookahead, max_lookahead=max_lookahead, lookahead_ratio=lookahead_ratio)
         self.get_logger().info(f"Loaded {len(self.pure_pursuit.waypoints_world)} waypoints")
         self.utils = Utils()
@@ -186,7 +185,9 @@ class RRT(Node):
     def populate_occupancy_grid(self, ranges, angle_increment):
         """
         Populate occupancy grid using lidar scans and save
-        the data in class member variable self.occupancy_grid
+        the data in class member variable self.occupancy_grid.
+
+        Optimization performed to improve the speed at which we generate the occupancy grid.
 
         Args:
             scan_msg (LaserScan): message from lidar scan topic
@@ -206,16 +207,13 @@ class RRT(Node):
             (i >= 0) & (i < self.grid_height) & 
             (j >= 0) & (j < self.grid_width)
         )
-        
         self.occupancy_grid[i[occupied_indices], j[occupied_indices]] = self.IS_OCCUPIED
-
-        #     #TODO: read up on fast voxel traverse (as compared to flood fill)
-        #     # set free space by fast voxel traverse
-        #     if self.populate_free:
-        #         free_cells = self.utils.traverse_grid(self.local_to_grid(0, 0), (i, j))
-        #         for cell in free_cells:
-        #             if self.occupancy_grid[cell] != self.IS_OCCUPIED:
-        #                 self.occupancy_grid[cell] = self.IS_FREE
+        
+        #     # set free space by fast voxel traverse. TOO SLOW
+    #         free_cells = self.utils.traverse_grid(self.local_to_grid(0, 0), (i, j))
+    #         for cell in free_cells:
+    #             if self.occupancy_grid[cell] != self.IS_OCCUPIED:
+    #                 self.occupancy_grid[cell] = self.IS_FREE
 
     # NYI
     def publish_occupancy_grid(self, frame_id, stamp):
@@ -257,12 +255,13 @@ class RRT(Node):
 
         # determine velocity
         if self.obstacle_detected:
-            logit = np.clip(
-                (2.0 / (1.0 + np.exp(-5 * (np.abs(np.degrees(angle)) / self.steering_limit)))) - 1.0,
-                0.0,
-                1.0
-            )
-            velocity = self.velocity_max - (logit * (self.velocity_max - self.velocity_min))
+            if np.degrees(angle) < 10.0:
+                velocity = self.velocity_max
+            elif np.degrees(angle) < 20.0:
+                velocity = (self.velocity_max + self.velocity_min) / 2
+            else:
+                velocity = self.velocity_min
+
         else:
             # Set velocity to velocity of racing line
             velocity = self.target_velocity * self.velocity_percentage
@@ -274,50 +273,46 @@ class RRT(Node):
         self.get_logger().info(f"Obstacle: {self.obstacle_detected} ... lookahead: {self.pure_pursuit.L:.2f} ... index: {self.pure_pursuit.index} ... Speed: {velocity:.2f}m/s ... Steering Angle: {np.degrees(angle):.2f} ... K_p: {self.K_p} ... velocity_percentage: {self.velocity_percentage:.2f}")
         self.drive_pub.publish(drive_msg)
 
-    # def drive_to_target_stanley(self, point):
-    #     """
-    #     Using the stanley method derivation 
-    #     """
-    #     # calculate curvature/steering angle
-    #     L = np.linalg.norm(point)
-    #     y = point[1]
+    def drive_to_target_stanley(self, point):
+        """
+        Using the stanley method derivation. 
         
+        Might get the best out of both worlds for responsiveness, and less oscillations.
+        """
+        # calculate curvature/steering angle
+        L = np.linalg.norm(point)
+        y = point[1]
         
-    #     # Calculate the cross track error (distance from the current position to the path)
-    #     heading_error = current_heading - math.atan2(lookahead_point.y - current_position.y, lookahead_point.x - current_position.x)
-    #     crosstrack_error = self.distance(current_position, closest_point) * math.sin(heading_error)
+        # determine velocity
+        if self.obstacle_detected:
+            if np.degrees(angle) < 10.0:
+                velocity = self.velocity_max
+            elif np.degrees(angle) < 20.0:
+                velocity = (self.velocity_max + self.velocity_min) / 2
+            else:
+                velocity = self.velocity_min
 
-    #     # Calculate the desired heading to follow the path
-    #     path_heading = math.atan2(lookahead_point.y - closest_point.y, lookahead_point.x - closest_point.x)
+        else:
+            # Set velocity to velocity of racing line
+            velocity = self.target_velocity * self.velocity_percentage
 
-    #     # Calculate the steering angle using the Stanley controller formula
-    #     steering_angle = heading_error + math.atan(self.k_e * crosstrack_error / (self.k_v + current_velocity)) + self.k_h * (path_heading - current_heading)
 
-    #     return steering_angle
         
-        
+        # Calculate the cross track error (distance from the current position to the path)
+        heading_error = current_heading - math.atan2(lookahead_point.y - current_position.y, lookahead_point.x - current_position.x)
+        crosstrack_error = self.distance(current_position, closest_point) * math.sin(heading_error)
 
-    #     angle = self.K_p * (2 * y) / (L**2)
-    #     angle = np.clip(angle, -np.radians(self.steering_limit), np.radians(self.steering_limit))
+        # Calculate the desired heading to follow the path
+        path_heading = math.atan2(lookahead_point.y - closest_point.y, lookahead_point.x - closest_point.x)
 
-    #     # determine velocity
-    #     if self.obstacle_detected:
-    #         logit = np.clip(
-    #             (2.0 / (1.0 + np.exp(-5 * (np.abs(np.degrees(angle)) / self.steering_limit)))) - 1.0,
-    #             0.0,
-    #             1.0
-    #         )
-    #         velocity = self.velocity_max - (logit * (self.velocity_max - self.velocity_min))
-    #     else:
-    #         # Set velocity to velocity of racing line
-    #         velocity = self.target_velocity * self.velocity_percentage
+        # Calculate the steering angle using the Stanley controller formula
+        angle = heading_error + math.atan(self.k_e * crosstrack_error / (self.k_v + current_velocity)) + self.k_h * (path_heading - current_heading)
 
-    #     # publish drive message
-    #     drive_msg = AckermannDriveStamped()
-    #     drive_msg.drive.speed          = velocity
-    #     drive_msg.drive.steering_angle = angle
-    #     self.get_logger().info(f"Obstacle: {self.obstacle_detected} ... lookahead: {self.pure_pursuit.L:.2f} ... index: {self.pure_pursuit.index} ... Speed: {velocity:.2f}m/s ... Steering Angle: {np.degrees(angle):.2f} ... K_p: {self.K_p} ... velocity_percentage: {self.velocity_percentage:.2f}")
-    #     self.drive_pub.publish(drive_msg)
+        drive_msg = AckermannDriveStamped()
+        drive_msg.drive.speed          = velocity
+        drive_msg.drive.steering_angle = angle
+        self.get_logger().info(f"Obstacle: {self.obstacle_detected} ... lookahead: {self.pure_pursuit.L:.2f} ... index: {self.pure_pursuit.index} ... Speed: {velocity:.2f}m/s ... Steering Angle: {np.degrees(angle):.2f} ... K_p: {self.K_p} ... velocity_percentage: {self.velocity_percentage:.2f}")
+        self.drive_pub.publish(drive_msg)
     
 
 
@@ -332,16 +327,7 @@ class RRT(Node):
         if (self.current_pose is None) or (self.goal_pos is None):
             return
 
-
-        """
-        Making some optimizations here because generating an occupancy grid every frame is
-        super time consuming. 
-        """
-
-        # If there is an obstacle, we generate an occupancy
-
         # populate occupancy grid
-
         self.populate_occupancy_grid(scan_msg.ranges, scan_msg.angle_increment)
         self.convolve_occupancy_grid()
         self.publish_occupancy_grid(scan_msg.header.frame_id, scan_msg.header.stamp)
@@ -358,8 +344,22 @@ class RRT(Node):
             return
         elif len(path_local) == 2:
             self.obstacle_detected = False
-        else:
+        elif len(path_local) == 3:
             self.obstacle_detected = True
+        else: # Too many points, try to resample, by halving the velocity
+            self.goal_pos, goal_pos_world = self.pure_pursuit.get_waypoint(self.current_pose, self.target_velocity / 2)
+            # get path planed in occupancy grid space
+            path_grid = self.rrt()
+            if path_grid is None:
+                return
+            # convert path from grid to local coordinates
+            path_local = [self.grid_to_local(point) for point in path_grid]
+            if len(path_local) < 2:
+                return
+            elif len(path_local) == 2:
+                self.obstacle_detected = False
+            elif len(path_local) < 4:
+                self.obstacle_detected = True
         
         # navigate to first node in tree
         self.drive_to_target(path_local[1])
@@ -384,9 +384,8 @@ class RRT(Node):
         current_pos = self.local_to_grid(0, 0)
         goal_pos = self.local_to_grid(self.goal_pos[0], self.goal_pos[1])
 
-
         try:
-            # resample a close point if our goal point is occupied
+            # If our goal point is occupied, we sample a new goal point that is close to the original goal point (within 5 cells)
             if self.occupancy_grid[goal_pos] == self.IS_OCCUPIED:
                 i, j = self.sample()
                 while np.linalg.norm(np.array([i, j]) - np.array(goal_pos)) > 5:
@@ -394,7 +393,10 @@ class RRT(Node):
                 goal_pos = (i, j)
         except IndexError:
             # if goal pose is outside our occupancy grid, we run into issues. 
-            self.get_logger().info(f"Goal point is out of bounds: {goal_pos}")
+            self.get_logger().info(f"Goal point is out of bounds of the occupancy grid: {goal_pos}")
+            return []
+        except Exception as e:
+            self.get_logger().info(f"Unknown error: {e}")
             return []
 
         # initialize start and goal trees
@@ -426,23 +428,9 @@ class RRT(Node):
         Returns:
             (i, j) (int, int): index of free cell in occupancy grid
         """
-        if self.populate_free:
+        i, j = np.random.randint(self.grid_height), np.random.randint(self.grid_width)
+        while self.occupancy_grid[i, j] != self.IS_FREE:
             i, j = np.random.randint(self.grid_height), np.random.randint(self.grid_width)
-            while self.occupancy_grid[i, j] != self.IS_FREE:
-                i, j = np.random.randint(self.grid_height), np.random.randint(self.grid_width)
-        else:
-            free = False
-            while not free:
-                i, j = np.random.randint(self.grid_height), np.random.randint(self.grid_width)
-                free = True
-                for cell in self.utils.traverse_grid(self.local_to_grid(0, 0), (i, j)):
-                    try:
-                        if self.occupancy_grid[cell] == self.IS_OCCUPIED:
-                            free = False
-                            break
-                    except IndexError:
-                        self.get_logger().info(f"Sampled point is out of bounds: {cell}")
-
         return (i, j)
 
     def expand_tree(self, tree, sampled_point, check_closer=False):

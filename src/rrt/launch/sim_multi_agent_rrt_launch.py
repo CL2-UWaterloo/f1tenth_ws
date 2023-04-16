@@ -25,8 +25,16 @@ def generate_launch_description():
         parameters=[config]
     )
 
+    waypoint_visualizer_node = Node(
+        package='pure_pursuit',
+        executable='waypoint_visualiser_node',
+        name='waypoint_visualiser_node',
+        parameters=[config]
+    )
+
     # finalize
     ld.add_action(rrt_node)
     ld.add_action(rrt_node_opp)
+    ld.add_action(waypoint_visualizer_node)
 
     return ld
