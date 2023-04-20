@@ -26,9 +26,9 @@ Racing lines are generated through the [Cl2-UWaterloo/Raceline-Optimization](htt
 These are the high level steps followed to get the F1TENTH driving in a new location, with [accompanying notes](https://stevengong.co/notes/F1TENTH-Field-Usage):
 1. Run SLAM on the physical car to generate a map with `slam_toolbox`
 2. Clean up map in Photoshop, and generate a racing line using the [Cl2-UWaterloo/Raceline-Optimization](https://github.com/CL2-UWaterloo/Raceline-Optimization) repository.
-3. Store the racing lines under `src/pure_pursuit/racelines/` and `src/rrt/racelines/` (for dynamic obstacle avoidance)
+3. Store the racing lines under `src/pure_pursuit/racelines/`
 4. Run `particle_filter` with the new map to localize the car properly
-5. Run `pure_pursuit` or `rrt` to follow the racing line. Make sure to incrementally increase the `velocity_profile` inside the [config.yaml](./src/pure_pursuit/config/config.yaml) file.
+5. Run `pure_pursuit` or `rrt` (for obstacle avoidance) to follow the racing line. Make sure to incrementally increase the `velocity_profile` inside the [config.yaml](./src/pure_pursuit/config/config.yaml) file.
 
 
 ## Getting Started
