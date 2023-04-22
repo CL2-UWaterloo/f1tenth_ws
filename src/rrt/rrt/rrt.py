@@ -84,7 +84,7 @@ class RRT(Node):
         self.utils = Utils()
 
 
-        self.pose_sub = self.create_subscription(Odometry, self.odom_topic, self.pose_callback, 1)
+        self.odom_sub = self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 1)
         self.scan_sub = self.create_subscription(LaserScan, self.scan_topic, self.scan_callback, 1)
 
         # publishers
@@ -117,6 +117,7 @@ class RRT(Node):
         # rrt variables
         self.path_world = []
         
+        self.prev_time = None
         self.obstacle_detected = False
         self.target_velocity = 0.0
 
@@ -145,15 +146,13 @@ class RRT(Node):
         j = np.round(y * -self.CELLS_PER_METER + self.CELL_Y_OFFSET).astype(int)
         return i,j
 
-
-
     def grid_to_local(self, point):
         i, j = point[0], point[1]
         x = (i - (self.grid_height - 1))  / -self.CELLS_PER_METER
         y = (j - self.CELL_Y_OFFSET) / -self.CELLS_PER_METER
         return (x, y)
 
-    def pose_callback(self, pose_msg: Odometry):
+    def odom_callback(self, pose_msg: Odometry):
         """
         The pose callback when subscribed to particle filter's inferred pose
         """
@@ -193,6 +192,7 @@ class RRT(Node):
             scan_msg (LaserScan): message from lidar scan topic
         """
         # reset empty occupacny grid (-1 = unknown)
+        
         self.occupancy_grid = np.full(shape=(self.grid_height, self.grid_width), fill_value=self.IS_FREE, dtype=int)
 
         ranges = np.array(ranges)
@@ -225,10 +225,10 @@ class RRT(Node):
         oc = OccupancyGrid()
         oc.header.frame_id = frame_id
         oc.header.stamp = stamp
-        oc.info.origin.position.y -= ((self.grid_width / 2) + 1) / 10
+        oc.info.origin.position.y -= ((self.grid_width / 2) + 1) / self.CELLS_PER_METER
         oc.info.width = self.grid_height
         oc.info.height = self.grid_width
-        oc.info.resolution = 0.1
+        oc.info.resolution = 1 / self.CELLS_PER_METER
         oc.data = np.fliplr(np.rot90(self.occupancy_grid, k=1)).flatten().tolist()
         self.occupancy_grid_pub.publish(oc)
 
@@ -254,7 +254,7 @@ class RRT(Node):
         angle = np.clip(angle, -np.radians(self.steering_limit), np.radians(self.steering_limit))
 
         # determine velocity
-        if self.obstacle_detected:
+        if self.obstacle_detected and self.velocity_percentage > 0.0:
             if np.degrees(angle) < 10.0:
                 velocity = self.velocity_max
             elif np.degrees(angle) < 20.0:
@@ -327,42 +327,115 @@ class RRT(Node):
         if (self.current_pose is None) or (self.goal_pos is None):
             return
 
+        # Run rrt less frequency
+        if self.prev_time is None:
+            self.prev_time = self.get_clock().now()
+
+        time_elapsed = self.get_clock().now() - self.prev_time
+        
+        if time_elapsed < Duration(seconds=0.1):
+            return
+        
+        self.prev_time = self.get_clock().now()
+
         # populate occupancy grid
         self.populate_occupancy_grid(scan_msg.ranges, scan_msg.angle_increment)
         self.convolve_occupancy_grid()
         self.publish_occupancy_grid(scan_msg.header.frame_id, scan_msg.header.stamp)
 
         # get path planed in occupancy grid space
-        path_grid = self.rrt()
-        if path_grid is None:
-            return
-
-        # convert path from grid to local coordinates
-        path_local = [self.grid_to_local(point) for point in path_grid]
-        
-        if len(path_local) < 2:
-            return
-        elif len(path_local) == 2:
-            self.obstacle_detected = False
-        elif len(path_local) == 3:
-            self.obstacle_detected = True
-        else: # Too many points, try to resample, by halving the velocity
-            self.goal_pos, goal_pos_world = self.pure_pursuit.get_waypoint(self.current_pose, self.target_velocity / 2)
-            # get path planed in occupancy grid space
+        path_local = []
+        USE_RRT = False # my new logic is a lot faster
+        if USE_RRT:
             path_grid = self.rrt()
-            if path_grid is None:
+            if path_grid is None or len(path_grid) < 2:
                 return
+
             # convert path from grid to local coordinates
             path_local = [self.grid_to_local(point) for point in path_grid]
+            self.get_logger().info(str(path_local))
             if len(path_local) < 2:
                 return
             elif len(path_local) == 2:
                 self.obstacle_detected = False
-            elif len(path_local) < 4:
+            else:
+                # Check if path is too jagged, we will increase our lookahead by 1m and try again
                 self.obstacle_detected = True
-        
-        # navigate to first node in tree
-        self.drive_to_target(path_local[1])
+
+                if self.check_angle(path_local):
+                    self.get_logger().info("Angle too sharp, increasing lookahead")
+                # if len(path_local) > 3:
+                    self.goal_pos, goal_pos_world = self.pure_pursuit.get_waypoint(self.current_pose, self.target_velocity, self.L + 1.0)
+                    # get path planed in occupancy grid space
+                    self.get_logger().info("trying to run RRT")
+                    path_grid = self.rrt()
+                    if path_grid is None:
+                        return
+                    # convert path from grid to local coordinates
+                    path_local = [self.grid_to_local(point) for point in path_grid]
+                    if len(path_local) < 2:
+                        return
+                #     elif len(path_local) == 2:
+                #         self.obstacle_detected = False
+                #     elif len(path_local) < 4:
+                #         self.obstacle_detected = True
+            
+            # navigate to first node in tree
+            self.drive_to_target(path_local[1])
+
+        else:
+            current_pos = np.array(self.local_to_grid(0, 0))
+            goal_pos = np.array(self.local_to_grid(self.goal_pos[0], self.goal_pos[1]))
+            # self.get_logger().info("Goal pos: " + np.array2string(goal_pos) + np.array2string(self.goal_pos) + str(self.grid_to_local(goal_pos)))
+            target = None
+            path_local = [self.grid_to_local(current_pos)]
+            MARGIN = int(self.CELLS_PER_METER * 0.1) # 0.1m margin
+            if self.check_collision(current_pos, goal_pos, margin=MARGIN):
+                self.obstacle_detected = True
+                
+                shifts = [-1, 1, -2, 2, -3, 3, -4, 4, -5, 5, -6, 6, -7, 7, -8, 8, -9, 9, -10, 10] # We can consider like 5 different paths, and this is depending on our lookahead
+                
+                found = False
+                for shift in shifts:
+                    new_goal = goal_pos + np.array([0, shift]) # x is forward facing, y is left facing, I got confused
+                    if not self.check_collision(current_pos, new_goal, margin=MARGIN): # Shift the goal pose. check_collision will handle points outside the occupancy grid, and return true
+                        target = self.grid_to_local(new_goal)
+                        found = True
+                        path_local.append(target)
+                        break
+
+                if not found:
+                    # If it still doesn't work, sample a point in the middle between the current position and the goal position
+                    middle_grid_point = np.array(current_pos + (goal_pos - current_pos) / 2).astype(int)
+                    
+                    for shift in shifts:
+                        new_goal = middle_grid_point + np.array([0, shift])
+                        if not self.check_collision(current_pos, new_goal, margin=MARGIN) and not self.check_collision(new_goal, goal_pos, margin=MARGIN):
+                            target = self.grid_to_local(new_goal)
+                            found = True
+                            path_local.append(target)
+                            break
+                
+            else:
+                self.obstacle_detected = False
+                target = self.grid_to_local(goal_pos)
+                path_local.append(target)
+            
+            if target:
+                self.drive_to_target(target)
+            else:
+                self.get_logger().info("Could not find a target path, halting vehicle")
+                # publish drive message
+                drive_msg = AckermannDriveStamped()
+                drive_msg.drive.speed          = 0.0
+                drive_msg.drive.steering_angle = 0.0
+                self.drive_pub.publish(drive_msg)
+
+
+
+            
+        self.get_logger().info("Path: " + str(path_local))
+
 
         # rrt visualization
         self.utils.draw_marker_array(
@@ -378,6 +451,18 @@ class RRT(Node):
             path_local,
             self.rrt_path_pub
         )
+            
+
+    def check_angle(self, points):
+        self.get_logger().info("checking angle")
+        p1 = np.array(points[:-2])
+        p2 = np.array(points[1:-1])
+        p3 = np.array(points[2:])
+        v1 = p1 - p2
+        v2 = p3 - p2
+        angle = np.abs(np.arctan2(v2[:,1], v2[:,0]) - np.arctan2(v1[:,1], v1[:,0]))
+        angle = np.where(angle > np.pi, 2*np.pi - angle, angle)
+        return np.any(angle > np.pi/2)
 
     def rrt(self):
         # convert position to occupancy grid indices
@@ -388,8 +473,13 @@ class RRT(Node):
             # If our goal point is occupied, we sample a new goal point that is close to the original goal point (within 5 cells)
             if self.occupancy_grid[goal_pos] == self.IS_OCCUPIED:
                 i, j = self.sample()
+                count = 0
                 while np.linalg.norm(np.array([i, j]) - np.array(goal_pos)) > 5:
+                    if count > 100:
+                        self.get_logger().info("Could not find a valid goal point")
+                        return []
                     i, j = self.sample()
+                    count += 1
                 goal_pos = (i, j)
         except IndexError:
             # if goal pose is outside our occupancy grid, we run into issues. 
@@ -498,25 +588,33 @@ class RRT(Node):
         b = self.grid_to_local(nearest_pos)
         return np.linalg.norm(a - self.goal_pos[:2]) < np.linalg.norm(b - self.goal_pos[:2])
 
-    def check_collision(self, cell_a, cell_b):
+    def check_collision(self, cell_a, cell_b, margin=0):
         """
         Checks whether the path between two cells
         in the occupancy grid is collision free.
+        
+        The margin is done by checking if adjacent cells are also free. We increment the j values
+
 
         Args:
             cell_a (i, j): index of cell a in occupancy grid
             cell_b (i, j): index of cell b in occupancy grid
+            margin (int): margin of safety around the path
         Returns:
             collision (bool): whether path between two cells would cause collision
         """
-        for cell in self.utils.traverse_grid(cell_a, cell_b):
-            if (cell[0] * cell[1] < 0) or (cell[0] >= self.grid_height) or (cell[1] >= self.grid_width):
-                continue
-            try:
-                if self.occupancy_grid[cell] == self.IS_OCCUPIED:
+        for i in range(-margin, margin + 1):
+            cell_a_margin = (cell_a[0], cell_a[1] + i)
+            cell_b_margin = (cell_b[0], cell_b[1] + i)
+            for cell in self.utils.traverse_grid(cell_a_margin, cell_b_margin):
+                if (cell[0] * cell[1] < 0) or (cell[0] >= self.grid_height) or (cell[1] >= self.grid_width):
+                    continue
+                try:
+                    if self.occupancy_grid[cell] == self.IS_OCCUPIED:
+                        return True
+                except:
+                    self.get_logger().info(f"Sampled point is out of bounds: {cell}")
                     return True
-            except:
-                self.get_logger().info(f"Sampled point is out of bounds: {cell}")
         return False
 
     def find_path(self, T_start, T_goal, pruning=True):
@@ -611,7 +709,7 @@ class Utils:
             marker.pose.position.x = position[0]
             marker.pose.position.y = position[1]
             marker.pose.position.z = 0.0
-            marker.lifetime = Duration(seconds=0.05).to_msg()
+            marker.lifetime = Duration(seconds=0.1).to_msg()
             marker_array.markers.append(marker)
         publisher.publish(marker_array)
 
@@ -703,7 +801,6 @@ class PurePursuit:
             file_path=filepath,
             segments=segments
         )
-        self.grid_width = 0.5
         self.index = 0
         self.velocity_index = 0
         print(f"Loaded {len(self.waypoints_world)} waypoints")
@@ -777,6 +874,8 @@ class PurePursuit:
 
     def get_waypoint(self, pose, target_velocity, fixed_lookahead=None):
         # get current position of car
+        if pose is None:
+            return 
         position = (pose.position.x, pose.position.y, 0)
 
         # transform way-points from world to vehicle frame of reference
@@ -796,7 +895,6 @@ class PurePursuit:
             self.L = min(max(self.min_lookahead, self.max_lookahead * target_velocity / self.lookahead_ratio), self.max_lookahead)
 
         indices_L = np.argsort(np.where(distances < self.L, distances, -1))[::-1]
-        self.CELL_Y_OFFSET = (self.grid_width // 2) - 1
 
         # set goal point to be the farthest valid waypoint within distance L
         for i in indices_L:

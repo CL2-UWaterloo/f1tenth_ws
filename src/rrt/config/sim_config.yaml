@@ -1,6 +1,6 @@
 ego_rrt:
   ros__parameters:
-    waypoints_path: "/sim_ws/src/pure_pursuit/racelines/e7_floor5_biggest.csv" 
+    waypoints_path: "/sim_ws/src/pure_pursuit/racelines/e7_floor5_square.csv" 
     scan_topic: "/scan"
     odom_topic: "/ego_racecar/odom"
     drive_topic: "/drive"
@@ -8,7 +8,7 @@ ego_rrt:
     segments: 0 # 0 means do not do interpolation
     velocity_percentage: 1.0
 
-    K_p: 1.0
+    K_p: 0.5
     min_lookahead: 1.0 # for larger track
     max_lookahead: 3.0 # lookahead when the car is going around max velocity
     lookahead_ratio: 8.0 # approximately the max velocity
@@ -17,11 +17,11 @@ ego_rrt:
     velocity_min: 1.0
     velocity_max: 3.0
     steering_limit: 25.0
-    cells_per_meter: 10
+    cells_per_meter: 20 # map resolution is usually 0.05m/cell, so this makes sense
 
 opp_rrt:
   ros__parameters:
-    waypoints_path: "/sim_ws/src/pure_pursuit/racelines/e7_floor5_biggest.csv" 
+    waypoints_path: "/sim_ws/src/pure_pursuit/racelines/e7_floor5_square.csv" 
     scan_topic: "/opp_scan"
     odom_topic: "/opp_racecar/odom"
     drive_topic: "/opp_drive"
@@ -31,7 +31,7 @@ opp_rrt:
     rrt_path_topic: "/opp_rrt_path"
     rrt_node_array_topic: "/opp_rrt_node_array"
     occupancy_grid_topic: "/opp_occupancy_grid"
-    velocity_percentage: 0.2
+    velocity_percentage: 0.0
 
     K_p: 0.5
     velocity_min: 1.0
@@ -42,4 +42,4 @@ opp_rrt:
 
 waypoint_visualiser_node:
   ros__parameters:
-    waypoints_path: "/sim_ws/src/pure_pursuit/racelines/e7_floor5_biggest.csv" 
+    waypoints_path: "/sim_ws/src/pure_pursuit/racelines/e7_floor5_square.csv" 
