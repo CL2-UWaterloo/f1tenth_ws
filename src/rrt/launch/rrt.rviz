@@ -157,6 +157,19 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /lookahead_waypoint
       Value: true
+    # - Class: rviz_default_plugins/Marker
+    #   Enabled: true
+    #   Name: Marker
+    #   Namespaces:
+    #     {}
+    #   Topic:
+    #     Depth: 5
+    #     Durability Policy: Volatile
+    #     History Policy: Keep Last
+    #     Reliability Policy: Reliable
+    #     Value: /current_waypoint
+    #   Value: true
+
     - Class: rviz_default_plugins/MarkerArray
       Enabled: true
       Name: MarkerArray
