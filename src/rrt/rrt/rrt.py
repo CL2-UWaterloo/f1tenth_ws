@@ -46,7 +46,8 @@ class RRT(Node):
         self.declare_parameter('K_p', 0.5)
         self.declare_parameter('min_lookahead', 1.0)
         self.declare_parameter('max_lookahead', 3.0)
-        self.declare_parameter('lookahead_ratio', 8.0)
+        self.declare_parameter('min_lookahead_speed', 3.0)
+        self.declare_parameter('max_lookahead_speed', 6.0)
         self.declare_parameter('segments', 0)
         self.declare_parameter('velocity_min', 0.5)
         self.declare_parameter('velocity_max', 2.0)
@@ -76,10 +77,11 @@ class RRT(Node):
 
         min_lookahead = float(self.get_parameter('min_lookahead').value)
         max_lookahead = float(self.get_parameter('max_lookahead').value)
-        lookahead_ratio = float(self.get_parameter('lookahead_ratio').value)
+        min_lookahead_speed = float(self.get_parameter('min_lookahead_speed').value)
+        max_lookahead_speed = float(self.get_parameter('max_lookahead_speed').value)
 
         # hyper-parameters
-        self.pure_pursuit = PurePursuit(node=self, L=self.L, segments=self.segments, filepath=self.waypoints_world_path, min_lookahead=min_lookahead, max_lookahead=max_lookahead, lookahead_ratio=lookahead_ratio)
+        self.pure_pursuit = PurePursuit(node=self, L=self.L, segments=self.segments, filepath=self.waypoints_world_path, min_lookahead=min_lookahead, max_lookahead=max_lookahead, min_lookahead_speed=min_lookahead_speed, max_lookahead_speed=max_lookahead_speed)
         self.get_logger().info(f"Loaded {len(self.pure_pursuit.waypoints_world)} waypoints")
         self.utils = Utils()
 
@@ -133,7 +135,8 @@ class RRT(Node):
         
         self.pure_pursuit.min_lookahead = float(self.get_parameter('min_lookahead').value)
         self.pure_pursuit.max_lookahead = float(self.get_parameter('max_lookahead').value)
-        self.pure_pursuit.lookahead_ratio = float(self.get_parameter('lookahead_ratio').value)
+        self.pure_pursuit.min_lookahead_speed = float(self.get_parameter('min_lookahead_speed').value)
+        self.pure_pursuit.max_lookahead_speed = float(self.get_parameter('max_lookahead_speed').value)
 
 
     def local_to_grid(self, x, y):
@@ -246,7 +249,11 @@ class RRT(Node):
         """
         Using the pure pursuit derivation
         
+        Improvement is that we make the point closer when the car is going at higher speeds
+        
         """
+        
+        
         # calculate curvature/steering angle
         L = np.linalg.norm(point)
         y = point[1]
@@ -389,32 +396,54 @@ class RRT(Node):
             # self.get_logger().info("Goal pos: " + np.array2string(goal_pos) + np.array2string(self.goal_pos) + str(self.grid_to_local(goal_pos)))
             target = None
             path_local = [self.grid_to_local(current_pos)]
-            MARGIN = int(self.CELLS_PER_METER * 0.1) # 0.1m margin
+            MARGIN = int(self.CELLS_PER_METER * 0.15) # 0.15m margin on each side, since the car is ~0.3m wide
             if self.check_collision(current_pos, goal_pos, margin=MARGIN):
                 self.obstacle_detected = True
                 
-                shifts = [-1, 1, -2, 2, -3, 3, -4, 4, -5, 5, -6, 6, -7, 7, -8, 8, -9, 9, -10, 10] # We can consider like 5 different paths, and this is depending on our lookahead
+                shifts = [-1, 1, -2, 2, -3, 3, -4, 4, -5, 5, -6, 6, -7, 7, -8, 8, -9, 9, -10, 10, -11, 11, -12, 12, -13, 13, -14, 14, -15, 15, -16, 16, -17, 17, -18, 18, -19, 19, -20, 20]
+                
+                # TODO: Check if we are already super close to an obstacle. If so, the logic below will not work
                 
                 found = False
                 for shift in shifts:
+                    # We consider various points to the left and right of the goal position
                     new_goal = goal_pos + np.array([0, shift]) # x is forward facing, y is left facing, I got confused
-                    if not self.check_collision(current_pos, new_goal, margin=MARGIN): # Shift the goal pose. check_collision will handle points outside the occupancy grid, and return true
+                    
+                    
+
+                    if not self.check_collision(current_pos, new_goal, margin=int(1.5*MARGIN)): # If we are currently super close to the wall, this logic doesn't work
                         target = self.grid_to_local(new_goal)
                         found = True
                         path_local.append(target)
+                        self.get_logger().info("Found condition 1")
                         break
 
                 if not found:
-                    # If it still doesn't work, sample a point in the middle between the current position and the goal position
+                    # This means that the obstacle is very close to us, we need even steeper turns
                     middle_grid_point = np.array(current_pos + (goal_pos - current_pos) / 2).astype(int)
                     
                     for shift in shifts:
                         new_goal = middle_grid_point + np.array([0, shift])
-                        if not self.check_collision(current_pos, new_goal, margin=MARGIN) and not self.check_collision(new_goal, goal_pos, margin=MARGIN):
+                        if not self.check_collision(current_pos, new_goal, margin=int(1.5*MARGIN)):
                             target = self.grid_to_local(new_goal)
                             found = True
                             path_local.append(target)
+                            self.get_logger().info("Found condition 2")
                             break
+                        
+                if not found:
+                    # Try again with a looser collision checker, we are probably very close to the obstacle, so check only collision free in the second half 
+                    middle_grid_point = np.array(current_pos + (goal_pos - current_pos) / 2).astype(int)
+                    
+                    for shift in shifts:
+                        new_goal = middle_grid_point + np.array([0, shift])
+                        if not self.check_collision_loose(current_pos, new_goal, margin=MARGIN):
+                            target = self.grid_to_local(new_goal)
+                            found = True
+                            path_local.append(target)
+                            self.get_logger().info("Found condition 3")
+                            break
+
                 
             else:
                 self.obstacle_detected = False
@@ -593,7 +622,10 @@ class RRT(Node):
         Checks whether the path between two cells
         in the occupancy grid is collision free.
         
-        The margin is done by checking if adjacent cells are also free. We increment the j values
+        The margin is done by checking if adjacent cells are also free. 
+        
+        One of the issues is that if the starting cell is next to a wall, then it already considers there to be a collision.
+        See check_collision_loose
 
 
         Args:
@@ -603,7 +635,7 @@ class RRT(Node):
         Returns:
             collision (bool): whether path between two cells would cause collision
         """
-        for i in range(-margin, margin + 1):
+        for i in range(-margin, margin + 1): # for the margin, check 
             cell_a_margin = (cell_a[0], cell_a[1] + i)
             cell_b_margin = (cell_b[0], cell_b[1] + i)
             for cell in self.utils.traverse_grid(cell_a_margin, cell_b_margin):
@@ -616,6 +648,38 @@ class RRT(Node):
                     self.get_logger().info(f"Sampled point is out of bounds: {cell}")
                     return True
         return False
+
+    def check_collision_loose(self, cell_a, cell_b, margin=0):
+        """
+        Checks whether the path between two cells
+        in the occupancy grid is collision free.
+        
+        The margin is done by checking if adjacent cells are also free. 
+        
+        This looser implementation only checks half way for meeting the margin requirement.
+        
+
+        Args:
+            cell_a (i, j): index of cell a in occupancy grid
+            cell_b (i, j): index of cell b in occupancy grid
+            margin (int): margin of safety around the path
+        Returns:
+            collision (bool): whether path between two cells would cause collision
+        """
+        for i in range(-margin, margin + 1): # for the margin, check 
+            cell_a_margin = (int((cell_a[0] + cell_b[0]) / 2), int((cell_a[1] + cell_b[1])/2) + i)
+            cell_b_margin = (cell_b[0], cell_b[1] + i)
+            for cell in self.utils.traverse_grid(cell_a_margin, cell_b_margin):
+                if (cell[0] * cell[1] < 0) or (cell[0] >= self.grid_height) or (cell[1] >= self.grid_width):
+                    continue
+                try:
+                    if self.occupancy_grid[cell] == self.IS_OCCUPIED:
+                        return True
+                except:
+                    self.get_logger().info(f"Sampled point is out of bounds: {cell}")
+                    return True
+        return False
+
 
     def find_path(self, T_start, T_goal, pruning=True):
         """
@@ -788,13 +852,14 @@ class Utils:
 
 
 class PurePursuit:
-    def __init__(self, node, L=1.7, segments=None, filepath="/f1tenth_ws/src/rrt/racelines/e7_floor5.csv", min_lookahead=0.5, max_lookahead=3.0, lookahead_ratio=8.0):
+    def __init__(self, node, L=1.7, segments=None, filepath="/f1tenth_ws/src/rrt/racelines/e7_floor5.csv", min_lookahead=0.5, max_lookahead=3.0, min_lookahead_speed=3.0, max_lookahead_speed=6.0):
         # TODO: Make self.L a function of the current velocity, so we have more intelligent RRT, although fixed lookahead is good most of the times?
         self.node = node
         self.L = L # dynamic lookahead distance
         self.min_lookahead = min_lookahead
         self.max_lookahead = max_lookahead
-        self.lookahead_ratio = lookahead_ratio
+        self.min_lookahead_speed = min_lookahead_speed
+        self.max_lookahead_speed = max_lookahead_speed
 
 
         self.waypoints_world, self.velocities = self.load_and_interpolate_waypoints(
@@ -890,9 +955,8 @@ class PurePursuit:
         if fixed_lookahead:
             self.L = fixed_lookahead
         else:
-            # Note that I use target_velocity to determine the lookahead, instead of current velocity, so the lookahead distance is predetermined based on the solver's velocity output, not on velocity_percentage
-            # if the car goes super slow, then RRT will have a very small lookahead distance, and so the car will wiggle a lot
-            self.L = min(max(self.min_lookahead, self.max_lookahead * target_velocity / self.lookahead_ratio), self.max_lookahead)
+            # Lookahead is proportional to velocity
+            self.L = min(max(self.min_lookahead, self.min_lookahead + (self.max_lookahead - self.min_lookahead) * (target_velocity - self.min_lookahead_speed) / (self.max_lookahead_speed - self.min_lookahead_speed)), self.max_lookahead)
 
         indices_L = np.argsort(np.where(distances < self.L, distances, -1))[::-1]
 

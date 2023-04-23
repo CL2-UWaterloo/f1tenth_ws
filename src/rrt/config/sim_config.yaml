@@ -6,16 +6,20 @@ ego_rrt:
     drive_topic: "/drive"
 
     segments: 0 # 0 means do not do interpolation
-    velocity_percentage: 1.0
+    velocity_percentage: 0.80
 
-    K_p: 0.5
+    # K_p: 0.5 # square track
+    K_p: 0.8 # square track
+
+    # normalized the lookahead
     min_lookahead: 1.0 # for larger track
     max_lookahead: 3.0 # lookahead when the car is going around max velocity
-    lookahead_ratio: 8.0 # approximately the max velocity
+    min_lookahead_speed: 3.0
+    max_lookahead_speed: 6.0 # approximately the max velocity
     
     # For when there is an obstacle
     velocity_min: 1.0
-    velocity_max: 3.0
+    velocity_max: 2.0
     steering_limit: 25.0
     cells_per_meter: 20 # map resolution is usually 0.05m/cell, so this makes sense
 
