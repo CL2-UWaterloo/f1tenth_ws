@@ -8,8 +8,8 @@ ego_rrt:
     segments: 0 # 0 means do not do interpolation
     velocity_percentage: 0.80
 
-    # K_p: 0.5 # square track
-    K_p: 0.8 # square track
+    K_p: 0.5 
+    K_p_obstacle: 0.8
 
     # normalized the lookahead
     min_lookahead: 1.0 # for larger track

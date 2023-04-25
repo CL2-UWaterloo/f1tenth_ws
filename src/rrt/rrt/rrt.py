@@ -44,6 +44,7 @@ class RRT(Node):
 
         self.declare_parameter('grid_width_meters', 6.0)
         self.declare_parameter('K_p', 0.5)
+        self.declare_parameter('K_p_obstacle', 0.8)
         self.declare_parameter('min_lookahead', 1.0)
         self.declare_parameter('max_lookahead', 3.0)
         self.declare_parameter('min_lookahead_speed', 3.0)
@@ -67,6 +68,7 @@ class RRT(Node):
         self.L = float(self.get_parameter('max_lookahead').value) # Set it to the max, this will be a variable lookahead
         self.grid_width_meters = float(self.get_parameter('grid_width_meters').value)
         self.K_p = float(self.get_parameter('K_p').value)
+        self.K_p_obstacle = float(self.get_parameter('K_p_obstacle').value)
         self.segments = int(self.get_parameter('segments').value)
         self.velocity_min = float(self.get_parameter('velocity_min').value)
         self.velocity_max = float(self.get_parameter('velocity_max').value)
@@ -126,6 +128,7 @@ class RRT(Node):
     def timer_callback(self):
         self.waypoints_world_path = str(self.get_parameter('waypoints_path').value)
         self.K_p = float(self.get_parameter('K_p').value)
+        self.K_p_obstacle = float(self.get_parameter('K_p_obstacle').value)
         self.segments = int(self.get_parameter('segments').value)
         self.velocity_min = float(self.get_parameter('velocity_min').value)
         self.velocity_max = float(self.get_parameter('velocity_max').value)
@@ -245,7 +248,7 @@ class RRT(Node):
         )
         self.occupancy_grid = np.clip(self.occupancy_grid, -1, 100)
 
-    def drive_to_target(self, point):
+    def drive_to_target(self, point, K_p):
         """
         Using the pure pursuit derivation
         
@@ -257,7 +260,7 @@ class RRT(Node):
         # calculate curvature/steering angle
         L = np.linalg.norm(point)
         y = point[1]
-        angle = self.K_p * (2 * y) / (L**2)
+        angle = K_p * (2 * y) / (L**2)
         angle = np.clip(angle, -np.radians(self.steering_limit), np.radians(self.steering_limit))
 
         # determine velocity
@@ -277,7 +280,7 @@ class RRT(Node):
         drive_msg = AckermannDriveStamped()
         drive_msg.drive.speed          = velocity
         drive_msg.drive.steering_angle = angle
-        self.get_logger().info(f"Obstacle: {self.obstacle_detected} ... lookahead: {self.pure_pursuit.L:.2f} ... index: {self.pure_pursuit.index} ... Speed: {velocity:.2f}m/s ... Steering Angle: {np.degrees(angle):.2f} ... K_p: {self.K_p} ... velocity_percentage: {self.velocity_percentage:.2f}")
+        self.get_logger().info(f"Obstacle: {self.obstacle_detected} ... lookahead: {self.pure_pursuit.L:.2f} ... index: {self.pure_pursuit.index} ... Speed: {velocity:.2f}m/s ... Steering Angle: {np.degrees(angle):.2f} ... K_p: {self.K_p} ... K_p_obstacle: {self.K_p_obstacle} ... velocity_percentage: {self.velocity_percentage:.2f}")
         self.drive_pub.publish(drive_msg)
 
     def drive_to_target_stanley(self, point):
@@ -451,7 +454,10 @@ class RRT(Node):
                 path_local.append(target)
             
             if target:
-                self.drive_to_target(target)
+                if self.obstacle_detected:
+                    self.drive_to_target(target, self.K_p_obstacle)
+                else:
+                    self.drive_to_target(target, self.K_p)
             else:
                 self.get_logger().info("Could not find a target path, halting vehicle")
                 # publish drive message

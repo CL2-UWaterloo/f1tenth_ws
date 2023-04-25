@@ -6,9 +6,11 @@ rrt:
     drive_topic:  "/drive"
   # segments = Number of points to interpolate to. The bigger the map, the more the number of segments
     segments: 0 # 0 means do not do interpolation
-    velocity_percentage: 0.8
+    velocity_percentage: 0.6
 
-    K_p: 0.8
+    K_p: 0.5
+    K_p_obstacle: 0.8
+
     min_lookahead: 1.0 # for larger track
     max_lookahead: 3.0 # lookahead when the car is going around max velocity
     min_lookahead_speed: 3.0
