@@ -121,7 +121,6 @@ class RRT(Node):
         # rrt variables
         self.path_world = []
         
-        self.prev_time = None
         self.obstacle_detected = False
         self.target_velocity = 0.0
 
@@ -336,17 +335,6 @@ class RRT(Node):
         # make sure we obtain initial pose and goal point
         if (self.current_pose is None) or (self.goal_pos is None):
             return
-
-        # Run rrt less frequency
-        if self.prev_time is None:
-            self.prev_time = self.get_clock().now()
-
-        time_elapsed = self.get_clock().now() - self.prev_time
-        
-        if time_elapsed < Duration(seconds=0.1):
-            return
-        
-        self.prev_time = self.get_clock().now()
 
         # populate occupancy grid
         self.populate_occupancy_grid(scan_msg.ranges, scan_msg.angle_increment)

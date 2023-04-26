@@ -6,7 +6,7 @@ rrt:
     drive_topic:  "/drive"
   # segments = Number of points to interpolate to. The bigger the map, the more the number of segments
     segments: 0 # 0 means do not do interpolation
-    velocity_percentage: 0.6
+    velocity_percentage: 0.8
 
     K_p: 0.5
     K_p_obstacle: 0.8
