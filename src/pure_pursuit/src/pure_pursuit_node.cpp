@@ -121,7 +121,7 @@ private:
     double curr_velocity = 0.0;
     
     bool emergency_breaking = false;
-    std::string current_lane = "left"; // left or right lane
+    std::string lane_number = "left"; // left or right lane
     
     
     //file object

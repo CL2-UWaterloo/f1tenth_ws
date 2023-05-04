@@ -1,12 +1,15 @@
 ego_rrt:
   ros__parameters:
     waypoints_path: "/sim_ws/src/pure_pursuit/racelines/e7_floor5_square.csv" 
+    waypoints_path_2nd: "/sim_ws/src/pure_pursuit/racelines/e7_floor5.csv"
     scan_topic: "/scan"
     odom_topic: "/ego_racecar/odom"
     drive_topic: "/drive"
 
+    lane_number: 0
+
     segments: 0 # 0 means do not do interpolation
-    velocity_percentage: 0.80
+    velocity_percentage: 1.0
 
     K_p: 0.5 
     K_p_obstacle: 0.8
@@ -26,6 +29,7 @@ ego_rrt:
 opp_rrt:
   ros__parameters:
     waypoints_path: "/sim_ws/src/pure_pursuit/racelines/e7_floor5_square.csv" 
+    waypoints_path_2nd: "/sim_ws/src/pure_pursuit/racelines/e7_floor5.csv"
     scan_topic: "/opp_scan"
     odom_topic: "/opp_racecar/odom"
     drive_topic: "/opp_drive"
@@ -35,7 +39,7 @@ opp_rrt:
     rrt_path_topic: "/opp_rrt_path"
     rrt_node_array_topic: "/opp_rrt_node_array"
     occupancy_grid_topic: "/opp_occupancy_grid"
-    velocity_percentage: 0.0
+    velocity_percentage: 0.8
 
     K_p: 0.5
     velocity_min: 1.0

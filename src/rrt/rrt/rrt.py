@@ -13,6 +13,14 @@ from scipy.spatial.transform import Rotation as R
 from collections import deque
 
 import rclpy
+from tf2_ros import TransformException
+from tf2_ros.buffer import Buffer
+from tf2_ros.transform_listener import TransformListener
+from geometry_msgs.msg import TransformStamped, Pose
+from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
+
+
+
 from rclpy.duration import Duration
 from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
@@ -33,6 +41,7 @@ class RRT(Node):
         super().__init__('rrt')
 
         self.declare_parameter('waypoints_path', '/sim_ws/src/pure_pursuit/racelines/e7_floor5.csv')
+        self.declare_parameter('waypoints_path_2nd', '/sim_ws/src/pure_pursuit/racelines/e7_floor5.csv')
         self.declare_parameter('scan_topic', '/scan')
         self.declare_parameter('odom_topic', '/ego_racecar/odom')
         self.declare_parameter('drive_topic', '/drive')
@@ -55,8 +64,11 @@ class RRT(Node):
         self.declare_parameter('velocity_percentage', 1.0)
         self.declare_parameter('steering_limit', 25.0)
         self.declare_parameter('cells_per_meter', 10)
+
+        self.declare_parameter('lane_number', 0)
         
         self.waypoints_world_path = str(self.get_parameter('waypoints_path').value)
+        self.waypoints_world_path_2nd = str(self.get_parameter('waypoints_path_2nd').value)
         self.scan_topic = str(self.get_parameter('scan_topic').value)
         self.odom_topic = str(self.get_parameter('odom_topic').value)
         self.drive_topic = str(self.get_parameter('drive_topic').value)
@@ -75,15 +87,16 @@ class RRT(Node):
         self.velocity_percentage = float(self.get_parameter('velocity_percentage').value)
         self.steering_limit = float(self.get_parameter('steering_limit').value)
         self.CELLS_PER_METER = int(self.get_parameter('cells_per_meter').value)
-        
 
+        self.lane_number = int(self.get_parameter('lane_number').value) # Dynamically change lanes
+        
         min_lookahead = float(self.get_parameter('min_lookahead').value)
         max_lookahead = float(self.get_parameter('max_lookahead').value)
         min_lookahead_speed = float(self.get_parameter('min_lookahead_speed').value)
         max_lookahead_speed = float(self.get_parameter('max_lookahead_speed').value)
 
         # hyper-parameters
-        self.pure_pursuit = PurePursuit(node=self, L=self.L, segments=self.segments, filepath=self.waypoints_world_path, min_lookahead=min_lookahead, max_lookahead=max_lookahead, min_lookahead_speed=min_lookahead_speed, max_lookahead_speed=max_lookahead_speed)
+        self.pure_pursuit = PurePursuit(node=self, L=self.L, segments=self.segments, filepath=self.waypoints_world_path, min_lookahead=min_lookahead, max_lookahead=max_lookahead, min_lookahead_speed=min_lookahead_speed, max_lookahead_speed=max_lookahead_speed, filepath_2nd=self.waypoints_world_path_2nd)
         self.get_logger().info(f"Loaded {len(self.pure_pursuit.waypoints_world)} waypoints")
         self.utils = Utils()
 
@@ -101,6 +114,8 @@ class RRT(Node):
         self.rrt_node_pub = self.create_publisher(MarkerArray, self.rrt_node_array_topic, 10)
         self.occupancy_grid_pub = self.create_publisher(OccupancyGrid, self.occupancy_grid_topic, 10)
 
+        # self.tf_buffer = Buffer()
+        # self.tf_listener = TransformListener(self.tf_buffer, self)
 
         # constants
         self.MAX_RANGE = self.L - 0.1
@@ -117,7 +132,12 @@ class RRT(Node):
         self.CELL_Y_OFFSET = (self.grid_width // 2) - 1 #cartesian frame orientation same as that of car local ref frame.
         self.occupancy_grid = np.full(shape=(self.grid_height, self.grid_width), fill_value=-1, dtype=int)
         self.current_pose = None
+        self.current_pose_wheelbase_front = None # from the laser frame, approx front wheelbase. Needed for stanley controller
         self.goal_pos = None
+
+        self.closest_wheelbase_rear_point = None
+        # self.base_link_to_laser_tf = None
+
         # rrt variables
         self.path_world = []
         
@@ -139,6 +159,8 @@ class RRT(Node):
         self.pure_pursuit.max_lookahead = float(self.get_parameter('max_lookahead').value)
         self.pure_pursuit.min_lookahead_speed = float(self.get_parameter('min_lookahead_speed').value)
         self.pure_pursuit.max_lookahead_speed = float(self.get_parameter('max_lookahead_speed').value)
+
+        self.pure_pursuit.lane_number = int(self.get_parameter('lane_number').value) # Dynamically change lanes
 
 
     def local_to_grid(self, x, y):
@@ -163,13 +185,47 @@ class RRT(Node):
         """
         # determine pose data type (sim vs. car)
         self.current_pose = pose_msg.pose.pose
-        # obtain pure pursuit waypoint
-        current_pos_world, self.target_velocity = self.pure_pursuit.get_closest_waypoint_with_velocity(self.current_pose)
+        self.get_logger().info("odom callback")
+        
+        # TOO SLOW
+        # to_frame_rel = "ego_racecar/base_link"
+        # from_frame_rel = "ego_racecar/laser_model"
+
+        # if self.base_link_to_laser_tf is None: # static tf, so only need to lookup once
+        #     try:
+        #         self.base_link_to_laser_tf = self.tf_buffer.lookup_transform(
+        #                 to_frame_rel,
+        #                 from_frame_rel,
+        #                 rclpy.time.Time())
+        #     except TransformException as ex:
+        #         self.get_logger().info(
+        #             f'Could not transform {to_frame_rel} to {from_frame_rel}: {ex}')
+        #         return
+        
+        # self.get_logger().info(str(self.base_link_to_laser_tf))
+        
+        current_pose_quaternion = np.array([
+            self.current_pose.orientation.x,
+            self.current_pose.orientation.y,
+            self.current_pose.orientation.z,
+            self.current_pose.orientation.w,
+        ])
+
+        # 33cm in front of base_link
+        self.current_pose_wheelbase_front = Pose()
+        current_pose_xyz = R.from_quat(current_pose_quaternion).apply((0.33, 0, 0)) + (self.current_pose.position.x, self.current_pose.position.y, 0)
+        self.current_pose_wheelbase_front.position.x = current_pose_xyz[0]
+        self.current_pose_wheelbase_front.position.y = current_pose_xyz[1]
+        self.current_pose_wheelbase_front.position.z = current_pose_xyz[2]
+        self.current_pose_wheelbase_front.orientation = self.current_pose.orientation
+
+        # obtain pure pursuit waypoint (base_link frame)
+        self.closest_wheelbase_rear_point, self.target_velocity = self.pure_pursuit.get_closest_waypoint_with_velocity(self.current_pose)
 
         self.utils.draw_marker(
             pose_msg.header.frame_id,
             pose_msg.header.stamp,
-            current_pos_world,
+            self.closest_wheelbase_rear_point,
             self.current_waypoint_pub,
             color="blue"
         )
@@ -254,8 +310,6 @@ class RRT(Node):
         Improvement is that we make the point closer when the car is going at higher speeds
         
         """
-        
-        
         # calculate curvature/steering angle
         L = np.linalg.norm(point)
         y = point[1]
@@ -282,45 +336,88 @@ class RRT(Node):
         self.get_logger().info(f"Obstacle: {self.obstacle_detected} ... lookahead: {self.pure_pursuit.L:.2f} ... index: {self.pure_pursuit.index} ... Speed: {velocity:.2f}m/s ... Steering Angle: {np.degrees(angle):.2f} ... K_p: {self.K_p} ... K_p_obstacle: {self.K_p_obstacle} ... velocity_percentage: {self.velocity_percentage:.2f}")
         self.drive_pub.publish(drive_msg)
 
-    def drive_to_target_stanley(self, point):
+    def drive_to_target_stanley(self):
         """
         Using the stanley method derivation. 
         
         Might get the best out of both worlds for responsiveness, and less oscillations.
         """
+        K_E = 2.0
+        K_V = 0
         # calculate curvature/steering angle
-        L = np.linalg.norm(point)
-        y = point[1]
+        closest_wheelbase_front_point_car, closest_wheelbase_front_point_world = self.pure_pursuit.get_waypoint_stanley(self.current_pose_wheelbase_front)
+
+        path_heading = math.atan2(closest_wheelbase_front_point_world[1] - self.closest_wheelbase_rear_point[1], closest_wheelbase_front_point_world[0] - self.closest_wheelbase_rear_point[0])
+        current_heading = math.atan2(self.current_pose_wheelbase_front.position.y - self.current_pose.position.y, self.current_pose_wheelbase_front.position.x - self.current_pose.position.x)
         
-        # determine velocity
-        if self.obstacle_detected:
-            if np.degrees(angle) < 10.0:
-                velocity = self.velocity_max
-            elif np.degrees(angle) < 20.0:
-                velocity = (self.velocity_max + self.velocity_min) / 2
-            else:
-                velocity = self.velocity_min
-
-        else:
-            # Set velocity to velocity of racing line
-            velocity = self.target_velocity * self.velocity_percentage
+        if current_heading < 0:
+            current_heading += 2 * math.pi
+        if path_heading < 0:
+            path_heading += 2 * math.pi
 
 
-        
-        # Calculate the cross track error (distance from the current position to the path)
-        heading_error = current_heading - math.atan2(lookahead_point.y - current_position.y, lookahead_point.x - current_position.x)
-        crosstrack_error = self.distance(current_position, closest_point) * math.sin(heading_error)
-
-        # Calculate the desired heading to follow the path
-        path_heading = math.atan2(lookahead_point.y - closest_point.y, lookahead_point.x - closest_point.x)
+        # calculate the errors
+        crosstrack_error = math.atan2(K_E * closest_wheelbase_front_point_car[1], K_V + self.target_velocity) # y value in car frame
+        heading_error = path_heading - current_heading
+        if heading_error > math.pi:
+            heading_error -= 2 * math.pi
+        elif heading_error < - math.pi:
+            heading_error += 2 * math.pi
 
         # Calculate the steering angle using the Stanley controller formula
-        angle = heading_error + math.atan(self.k_e * crosstrack_error / (self.k_v + current_velocity)) + self.k_h * (path_heading - current_heading)
+        angle = heading_error + crosstrack_error
+
+        self.get_logger().info(f"heading_error: {heading_error:.2f} ... crosstrack_error: {crosstrack_error:.2f} angle: {np.degrees(angle):.2f}")
+        self.get_logger().info(f"current_heading: {current_heading:.2f} ... path_heading: {path_heading:.2f}")
+
+        angle = np.clip(angle, -np.radians(self.steering_limit), np.radians(self.steering_limit))
+
+        velocity = self.target_velocity * self.velocity_percentage
 
         drive_msg = AckermannDriveStamped()
         drive_msg.drive.speed          = velocity
         drive_msg.drive.steering_angle = angle
-        self.get_logger().info(f"Obstacle: {self.obstacle_detected} ... lookahead: {self.pure_pursuit.L:.2f} ... index: {self.pure_pursuit.index} ... Speed: {velocity:.2f}m/s ... Steering Angle: {np.degrees(angle):.2f} ... K_p: {self.K_p} ... velocity_percentage: {self.velocity_percentage:.2f}")
+        self.drive_pub.publish(drive_msg)
+    
+    def drive_to_target_stanley_obstacle(self):
+        """
+        Using the stanley method derivation.
+        """
+        K_E = 2.0
+        K_V = 0
+        # calculate curvature/steering angle
+        closest_wheelbase_front_point_car, closest_wheelbase_front_point_world = self.pure_pursuit.get_waypoint_stanley(self.current_pose_wheelbase_front)
+
+        path_heading = math.atan2(closest_wheelbase_front_point_world[1] - self.closest_wheelbase_rear_point[1], closest_wheelbase_front_point_world[0] - self.closest_wheelbase_rear_point[0])
+        current_heading = math.atan2(self.current_pose_wheelbase_front.position.y - self.current_pose.position.y, self.current_pose_wheelbase_front.position.x - self.current_pose.position.x)
+        
+        if current_heading < 0:
+            current_heading += 2 * math.pi
+        if path_heading < 0:
+            path_heading += 2 * math.pi
+
+
+        # calculate the errors
+        crosstrack_error = math.atan2(K_E * closest_wheelbase_front_point_car[1], K_V + self.target_velocity) # y value in car frame
+        heading_error = path_heading - current_heading
+        if heading_error > math.pi:
+            heading_error -= 2 * math.pi
+        elif heading_error < - math.pi:
+            heading_error += 2 * math.pi
+
+        # Calculate the steering angle using the Stanley controller formula
+        angle = heading_error + crosstrack_error
+
+        self.get_logger().info(f"heading_error: {heading_error:.2f} ... crosstrack_error: {crosstrack_error:.2f} angle: {np.degrees(angle):.2f}")
+        self.get_logger().info(f"current_heading: {current_heading:.2f} ... path_heading: {path_heading:.2f}")
+
+        angle = np.clip(angle, -np.radians(self.steering_limit), np.radians(self.steering_limit))
+
+        velocity = self.target_velocity * self.velocity_percentage
+
+        drive_msg = AckermannDriveStamped()
+        drive_msg.drive.speed          = velocity
+        drive_msg.drive.steering_angle = angle
         self.drive_pub.publish(drive_msg)
     
 
@@ -384,7 +481,6 @@ class RRT(Node):
         else:
             current_pos = np.array(self.local_to_grid(0, 0))
             goal_pos = np.array(self.local_to_grid(self.goal_pos[0], self.goal_pos[1]))
-            # self.get_logger().info("Goal pos: " + np.array2string(goal_pos) + np.array2string(self.goal_pos) + str(self.grid_to_local(goal_pos)))
             target = None
             path_local = [self.grid_to_local(current_pos)]
             MARGIN = int(self.CELLS_PER_METER * 0.15) # 0.15m margin on each side, since the car is ~0.3m wide
@@ -445,7 +541,8 @@ class RRT(Node):
                 if self.obstacle_detected:
                     self.drive_to_target(target, self.K_p_obstacle)
                 else:
-                    self.drive_to_target(target, self.K_p)
+                    # self.drive_to_target(target, self.K_p)
+                    self.drive_to_target_stanley()
             else:
                 self.get_logger().info("Could not find a target path, halting vehicle")
                 # publish drive message
@@ -455,9 +552,6 @@ class RRT(Node):
                 self.drive_pub.publish(drive_msg)
 
 
-
-            
-        self.get_logger().info("Path: " + str(path_local))
 
 
         # rrt visualization
@@ -846,7 +940,7 @@ class Utils:
 
 
 class PurePursuit:
-    def __init__(self, node, L=1.7, segments=None, filepath="/f1tenth_ws/src/rrt/racelines/e7_floor5.csv", min_lookahead=0.5, max_lookahead=3.0, min_lookahead_speed=3.0, max_lookahead_speed=6.0):
+    def __init__(self, node, L=1.7, segments=None, filepath="/f1tenth_ws/src/rrt/racelines/e7_floor5.csv", min_lookahead=0.5, max_lookahead=3.0, min_lookahead_speed=3.0, max_lookahead_speed=6.0, filepath_2nd="/f1tenth_ws/src/rrt/racelines/e7_floor5.csv", lane_number=0):
         # TODO: Make self.L a function of the current velocity, so we have more intelligent RRT, although fixed lookahead is good most of the times?
         self.node = node
         self.L = L # dynamic lookahead distance
@@ -854,12 +948,19 @@ class PurePursuit:
         self.max_lookahead = max_lookahead
         self.min_lookahead_speed = min_lookahead_speed
         self.max_lookahead_speed = max_lookahead_speed
-
-
+        
         self.waypoints_world, self.velocities = self.load_and_interpolate_waypoints(
             file_path=filepath,
             segments=segments
         )
+        
+        # For competition, where I want to customize the lanes that I am using
+        self.lane_number = lane_number
+        self.waypoints_world_2nd, self.velocities_2nd = self.load_and_interpolate_waypoints(
+            file_path=filepath_2nd,
+            segments=segments
+        )
+
         self.index = 0
         self.velocity_index = 0
         print(f"Loaded {len(self.waypoints_world)} waypoints")
@@ -887,7 +988,7 @@ class PurePursuit:
         # Add first point as last point to complete loop
         self.node.get_logger().info(str(velocities))
         
-        if segments != 0: # interpolate, not generally needed because interpolation can be done with the solver, where you feed in target distance between points
+        if segments != 0 and segments is not None: # interpolate, not generally needed because interpolation can be done with the solver, where you feed in target distance between points
             # Linear length along the line
             distance = np.cumsum(np.sqrt(np.sum(np.diff(points, axis=0)**2, axis=1)))
             distance = np.insert(distance, 0, 0) / distance[-1] # Normalize distance between 0 and 1
@@ -918,18 +1019,51 @@ class PurePursuit:
 
     def get_closest_waypoint_with_velocity(self, pose):
         # get current position of car
+        if pose is None:
+            return
+
         position = (pose.position.x, pose.position.y, 0)
 
         # transform way-points from world to vehicle frame of reference
-        waypoints_car = self.transform_waypoints(self.waypoints_world, position, pose)
+        if self.lane_number == 0:
+            waypoints_car = self.transform_waypoints(self.waypoints_world, position, pose)
+        else:
+            waypoints_car = self.transform_waypoints(self.waypoints_world_2nd, position, pose)
 
         # get distance from car to all waypoints
         distances = np.linalg.norm(waypoints_car, axis=1)
 
         # get indices of waypoints sorted by ascending distance
         self.velocity_index = np.argmin(distances)
+        
+        if self.lane_number == 0:
+            return self.waypoints_world[self.velocity_index], self.velocities[self.velocity_index]
+        else:
+            return self.waypoints_world_2nd[self.velocity_index], self.velocities_2nd[self.velocity_index]
 
-        return self.waypoints_world[self.velocity_index], self.velocities[self.velocity_index]
+    def get_waypoint_stanley(self, pose):
+        # get current position of car
+        if pose is None:
+            return 
+        position = (pose.position.x, pose.position.y, 0)
+
+        # transform way-points from world to vehicle frame of reference
+        if self.lane_number == 0:
+            waypoints_car = self.transform_waypoints(self.waypoints_world, position, pose)
+        else:
+            waypoints_car = self.transform_waypoints(self.waypoints_world_2nd, position, pose)
+
+        # get distance from car to all waypoints
+        distances = np.linalg.norm(waypoints_car, axis=1)
+
+        # get indices of waypoints sorted by ascending distance
+        index = np.argmin(distances)
+        
+        if self.lane_number == 0:
+            return waypoints_car[index], self.waypoints_world[index]
+        else:
+            return waypoints_car[index], self.waypoints_world_2nd[index]
+
 
     def get_waypoint(self, pose, target_velocity, fixed_lookahead=None):
         # get current position of car
@@ -938,7 +1072,11 @@ class PurePursuit:
         position = (pose.position.x, pose.position.y, 0)
 
         # transform way-points from world to vehicle frame of reference
-        waypoints_car = self.transform_waypoints(self.waypoints_world, position, pose)
+        if self.lane_number == 0:
+            waypoints_car = self.transform_waypoints(self.waypoints_world, position, pose)
+        else:
+            waypoints_car = self.transform_waypoints(self.waypoints_world_2nd, position, pose)
+
 
         # get distance from car to all waypoints
         distances = np.linalg.norm(waypoints_car, axis=1)
@@ -960,7 +1098,10 @@ class PurePursuit:
             x = waypoints_car[i][0]
             if x > 0:
                 self.index = i
-                return waypoints_car[self.index], self.waypoints_world[self.index]
+                if self.lane_number == 0:
+                    return waypoints_car[self.index], self.waypoints_world[self.index]
+                else:
+                    return waypoints_car[self.index], self.waypoints_world_2nd[self.index]
         return None, None
 
 
