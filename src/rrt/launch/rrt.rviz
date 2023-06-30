@@ -182,6 +182,18 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /rrt_node_array
       Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: MarkerArray
+      Namespaces:
+        "": true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /waypoints
+      Value: true
     - Class: rviz_default_plugins/Marker
       Enabled: true
       Name: Marker
