@@ -1,18 +1,22 @@
 rrt:
   ros__parameters:
-    waypoints_path: "/f1tenth_ws/src/pure_pursuit/racelines/e7_floor5_square.csv" 
+    waypoints_path: "/f1tenth_ws/src/rrt/racelines/e7_floor5_biggest.csv" 
+    waypoints_path_2nd: "/f1tenth_ws/src/rrt/racelines/competition_racing_2.csv"
     scan_topic:  "/scan"
     odom_topic:  "/pf/pose/odom"
     drive_topic:  "/drive"
-  # segments = Number of points to interpolate to. The bigger the map, the more the number of segments
-    segments: 0 # 0 means do not do interpolation
+    interpolation_distance: 0.05
     velocity_percentage: 0.8
+
+    lane_number: 0
 
     K_p: 0.5
     K_p_obstacle: 0.8
+    K_E: 1.0
+    K_H: 0.5
 
-    min_lookahead: 1.0 # for larger track
-    max_lookahead: 3.0 # lookahead when the car is going around max velocity
+    min_lookahead: 1.5 # for larger track
+    max_lookahead: 2.5 # lookahead when the car is going around max velocity
     min_lookahead_speed: 3.0
     max_lookahead_speed: 6.0 # approximately the max velocity
     
@@ -24,4 +28,4 @@ rrt:
 
 waypoint_visualiser_node:
   ros__parameters:
-    waypoints_path: "/f1tenth_ws/src/pure_pursuit/racelines/e7_floor5_square.csv" 
+    waypoints_path: "/f1tenth_ws/src/rrt/racelines/e7_floor5_biggest.csv" 

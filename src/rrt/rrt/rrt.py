@@ -54,11 +54,13 @@ class RRT(Node):
         self.declare_parameter('grid_width_meters', 6.0)
         self.declare_parameter('K_p', 0.5)
         self.declare_parameter('K_p_obstacle', 0.8)
+        self.declare_parameter('K_E', 2.0)
+        self.declare_parameter('K_H', 1.5)
         self.declare_parameter('min_lookahead', 1.0)
         self.declare_parameter('max_lookahead', 3.0)
         self.declare_parameter('min_lookahead_speed', 3.0)
         self.declare_parameter('max_lookahead_speed', 6.0)
-        self.declare_parameter('segments', 0)
+        self.declare_parameter('interpolation_distance', 0.05)
         self.declare_parameter('velocity_min', 0.5)
         self.declare_parameter('velocity_max', 2.0)
         self.declare_parameter('velocity_percentage', 1.0)
@@ -79,9 +81,11 @@ class RRT(Node):
         self.occupancy_grid_topic = str(self.get_parameter('occupancy_grid_topic').value)
         self.L = float(self.get_parameter('max_lookahead').value) # Set it to the max, this will be a variable lookahead
         self.grid_width_meters = float(self.get_parameter('grid_width_meters').value)
+        self.K_E = float(self.get_parameter('K_E').value)
+        self.K_H = float(self.get_parameter('K_H').value)
         self.K_p = float(self.get_parameter('K_p').value)
         self.K_p_obstacle = float(self.get_parameter('K_p_obstacle').value)
-        self.segments = int(self.get_parameter('segments').value)
+        self.interpolation_distance = float(self.get_parameter('interpolation_distance').value)
         self.velocity_min = float(self.get_parameter('velocity_min').value)
         self.velocity_max = float(self.get_parameter('velocity_max').value)
         self.velocity_percentage = float(self.get_parameter('velocity_percentage').value)
@@ -96,7 +100,7 @@ class RRT(Node):
         max_lookahead_speed = float(self.get_parameter('max_lookahead_speed').value)
 
         # hyper-parameters
-        self.pure_pursuit = PurePursuit(node=self, L=self.L, segments=self.segments, filepath=self.waypoints_world_path, min_lookahead=min_lookahead, max_lookahead=max_lookahead, min_lookahead_speed=min_lookahead_speed, max_lookahead_speed=max_lookahead_speed, filepath_2nd=self.waypoints_world_path_2nd)
+        self.pure_pursuit = PurePursuit(node=self, L=self.L, interpolation_distance=self.interpolation_distance, filepath=self.waypoints_world_path, min_lookahead=min_lookahead, max_lookahead=max_lookahead, min_lookahead_speed=min_lookahead_speed, max_lookahead_speed=max_lookahead_speed, filepath_2nd=self.waypoints_world_path_2nd)
         self.get_logger().info(f"Loaded {len(self.pure_pursuit.waypoints_world)} waypoints")
         self.utils = Utils()
 
@@ -146,9 +150,11 @@ class RRT(Node):
 
     def timer_callback(self):
         self.waypoints_world_path = str(self.get_parameter('waypoints_path').value)
+        self.K_E = float(self.get_parameter('K_E').value)
+        self.K_H = float(self.get_parameter('K_H').value)
         self.K_p = float(self.get_parameter('K_p').value)
         self.K_p_obstacle = float(self.get_parameter('K_p_obstacle').value)
-        self.segments = int(self.get_parameter('segments').value)
+        self.interpolation_distance = int(self.get_parameter('interpolation_distance').value)
         self.velocity_min = float(self.get_parameter('velocity_min').value)
         self.velocity_max = float(self.get_parameter('velocity_max').value)
         self.velocity_percentage = float(self.get_parameter('velocity_percentage').value)
@@ -185,7 +191,6 @@ class RRT(Node):
         """
         # determine pose data type (sim vs. car)
         self.current_pose = pose_msg.pose.pose
-        self.get_logger().info("odom callback")
         
         # TOO SLOW
         # to_frame_rel = "ego_racecar/base_link"
@@ -342,7 +347,6 @@ class RRT(Node):
         
         Might get the best out of both worlds for responsiveness, and less oscillations.
         """
-        K_E = 2.0
         K_V = 0
         # calculate curvature/steering angle
         closest_wheelbase_front_point_car, closest_wheelbase_front_point_world = self.pure_pursuit.get_waypoint_stanley(self.current_pose_wheelbase_front)
@@ -357,12 +361,14 @@ class RRT(Node):
 
 
         # calculate the errors
-        crosstrack_error = math.atan2(K_E * closest_wheelbase_front_point_car[1], K_V + self.target_velocity) # y value in car frame
+        crosstrack_error = math.atan2(self.K_E * closest_wheelbase_front_point_car[1], K_V + self.target_velocity) # y value in car frame
         heading_error = path_heading - current_heading
         if heading_error > math.pi:
             heading_error -= 2 * math.pi
         elif heading_error < - math.pi:
             heading_error += 2 * math.pi
+
+        heading_error *= self.K_H
 
         # Calculate the steering angle using the Stanley controller formula
         angle = heading_error + crosstrack_error
@@ -383,7 +389,6 @@ class RRT(Node):
         """
         Using the stanley method derivation.
         """
-        K_E = 2.0
         K_V = 0
         # calculate curvature/steering angle
         closest_wheelbase_front_point_car, closest_wheelbase_front_point_world = self.pure_pursuit.get_waypoint_stanley(self.current_pose_wheelbase_front)
@@ -398,7 +403,7 @@ class RRT(Node):
 
 
         # calculate the errors
-        crosstrack_error = math.atan2(K_E * closest_wheelbase_front_point_car[1], K_V + self.target_velocity) # y value in car frame
+        crosstrack_error = math.atan2(self.K_E * closest_wheelbase_front_point_car[1], K_V + self.target_velocity) # y value in car frame
         heading_error = path_heading - current_heading
         if heading_error > math.pi:
             heading_error -= 2 * math.pi
@@ -940,7 +945,7 @@ class Utils:
 
 
 class PurePursuit:
-    def __init__(self, node, L=1.7, segments=None, filepath="/f1tenth_ws/src/rrt/racelines/e7_floor5.csv", min_lookahead=0.5, max_lookahead=3.0, min_lookahead_speed=3.0, max_lookahead_speed=6.0, filepath_2nd="/f1tenth_ws/src/rrt/racelines/e7_floor5.csv", lane_number=0):
+    def __init__(self, node, L=1.7, interpolation_distance=None, filepath="/f1tenth_ws/src/rrt/racelines/e7_floor5.csv", min_lookahead=0.5, max_lookahead=3.0, min_lookahead_speed=3.0, max_lookahead_speed=6.0, filepath_2nd="/f1tenth_ws/src/rrt/racelines/e7_floor5.csv", lane_number=0):
         # TODO: Make self.L a function of the current velocity, so we have more intelligent RRT, although fixed lookahead is good most of the times?
         self.node = node
         self.L = L # dynamic lookahead distance
@@ -951,14 +956,14 @@ class PurePursuit:
         
         self.waypoints_world, self.velocities = self.load_and_interpolate_waypoints(
             file_path=filepath,
-            segments=segments
+            interpolation_distance=interpolation_distance
         )
         
         # For competition, where I want to customize the lanes that I am using
         self.lane_number = lane_number
         self.waypoints_world_2nd, self.velocities_2nd = self.load_and_interpolate_waypoints(
             file_path=filepath_2nd,
-            segments=segments
+            interpolation_distance=interpolation_distance
         )
 
         self.index = 0
@@ -980,7 +985,7 @@ class PurePursuit:
 
         return waypoints
 
-    def load_and_interpolate_waypoints(self, file_path, segments=0):
+    def load_and_interpolate_waypoints(self, file_path, interpolation_distance=0.05):
         # Read waypoints from csv, first two columns are x and y, third column is velocity
         points = np.genfromtxt(file_path, delimiter=",")[:, :2] # Exclude last row, because that closes the loop
         velocities = np.genfromtxt(file_path, delimiter=",")[:, 2]
@@ -988,7 +993,17 @@ class PurePursuit:
         # Add first point as last point to complete loop
         self.node.get_logger().info(str(velocities))
         
-        if segments != 0 and segments is not None: # interpolate, not generally needed because interpolation can be done with the solver, where you feed in target distance between points
+
+        
+        if interpolation_distance != 0 and interpolation_distance is not None: # interpolate, not generally needed because interpolation can be done with the solver, where you feed in target distance between points
+            # Calculate the cumulative distances between points
+            distances = np.sqrt(np.sum(np.diff(points, axis=0)**2, axis=1))
+            cumulative_distances = np.insert(np.cumsum(distances), 0, 0)
+
+            # Calculate the number of segments based on the desired distance threshold
+            total_distance = cumulative_distances[-1]
+            segments = int(total_distance / interpolation_distance)
+
             # Linear length along the line
             distance = np.cumsum(np.sqrt(np.sum(np.diff(points, axis=0)**2, axis=1)))
             distance = np.insert(distance, 0, 0) / distance[-1] # Normalize distance between 0 and 1
@@ -1009,6 +1024,7 @@ class PurePursuit:
             )
             assert(len(interpolated_points) == len(interpolated_velocities))
             return interpolated_points, interpolated_velocities
+
         else:
             # Add z-coordinate to be 0
             points = np.hstack(
