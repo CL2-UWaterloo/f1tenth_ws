@@ -11,10 +11,10 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 # Find dependencies
-foreach(PACKAGE 
-  ament_cmake 
+foreach(PACKAGE
+  ament_cmake
   rclcpp
-  rclpy 
+  rclpy
   geometry_msgs
   nav_msgs
   ackermann_msgs
@@ -35,9 +35,9 @@ include_directories(
 )
 
 # Create Cpp executable
-add_executable(waypoint_generator src/waypoint_subscriber.cpp)
+add_executable(waypoint_generator src/waypoint_generator.cpp)
 
-ament_target_dependencies(waypoint_generator 
+ament_target_dependencies(waypoint_generator
   rclcpp geometry_msgs ackermann_msgs nav_msgs sensor_msgs std_msgs visualization_msgs tf2_ros
 )
 
