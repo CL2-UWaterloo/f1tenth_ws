@@ -17,6 +17,6 @@ pure_pursuit:
     steering_limit: 25.0
     velocity_percentage: 1.0 # the limit, can only do 1 lap with clean tires
 
-waypoint_visualiser_node:
+waypoint_visualizer_node:
   ros__parameters:
     waypoints_path: "/sim_ws/src/pure_pursuit/racelines/e7_floor5_square.csv"
