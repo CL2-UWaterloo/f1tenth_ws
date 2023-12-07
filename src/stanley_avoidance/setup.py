@@ -2,7 +2,7 @@ from setuptools import setup
 import os
 from glob import glob
 
-package_name = 'rrt'
+package_name = 'stanley_avoidance'
 
 setup(
     name=package_name,
@@ -20,12 +20,12 @@ setup(
     zip_safe=True,
     maintainer='Steven Gong',
     maintainer_email='s36gong@uwaterloo.ca',
-    description='f1tenth rrt',
+    description='stanley avoidance',
     license='TODO: License declaration',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'rrt = rrt.rrt:main',
+            'stanley_avoidance = stanley_avoidance.stanley_avoidance:main',
         ],
     },
 )

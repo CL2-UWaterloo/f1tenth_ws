@@ -180,7 +180,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /rrt_node_array
+        Value: /stanley_avoidance_path_array
       Value: true
     - Class: rviz_default_plugins/MarkerArray
       Enabled: true
@@ -204,7 +204,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /rrt_path
+        Value: /stanley_avoidance_path
       Value: true
   Enabled: true
   Global Options:
