@@ -1,0 +1,54 @@
+ego_stanley_avoidance:
+  ros__parameters:
+    waypoints_path: "/sim_ws/src/stanley_avoidance/racelines/silverstone.csv"
+    waypoints_path_2nd: "/sim_ws/src/stanley_avoidance/racelines/silverstone.csv"
+    scan_topic: "/scan"
+    odom_topic: "/ego_racecar/odom"
+    drive_topic: "/drive"
+
+    lane_number: 0
+
+    interpolation_distance: 0.05
+    velocity_percentage: 0.5
+
+    K_p: 0.5
+    K_p_obstacle: 0.8
+
+    # normalized the lookahead
+    min_lookahead: 1.0 # for larger track
+    max_lookahead: 3.0 # lookahead when the car is going around max velocity
+    min_lookahead_speed: 3.0
+    max_lookahead_speed: 6.0 # approximately the max velocity
+
+    # For when there is an obstacle
+    velocity_min: 1.0
+    velocity_max: 2.0
+    steering_limit: 25.0
+    cells_per_meter: 20 # map resolution is usually 0.05m/cell, so this makes sense
+
+opp_stanley_avoidance:
+  ros__parameters:
+    waypoints_path: "/sim_ws/src/stanley_avoidance/racelines/silverstone.csv"
+    waypoints_path_2nd: "/sim_ws/src/stanley_avoidance/racelines/silverstone.csv"
+    scan_topic: "/opp_scan"
+    odom_topic: "/opp_racecar/odom"
+    drive_topic: "/opp_drive"
+
+    rviz_current_waypoint_topic: "/opp_current_waypoint"
+    rviz_lookahead_waypoint_topic: "/opp_lookahead_waypoint"
+    stanley_avoidance_path_topic: "/opp_stanley_avoidance_path"
+    stanley_avoidance_path_array_topic: "/opp_stanley_avoidance_path_array"
+    occupancy_grid_topic: "/opp_occupancy_grid"
+
+    interpolation_distance: 0.05
+    velocity_percentage: 0.5
+
+    K_p: 0.5
+    velocity_min: 1.0
+    velocity_max: 3.0
+    steering_limit: 25.0
+    cells_per_meter: 10
+
+waypoint_visualizer_node:
+  ros__parameters:
+    waypoints_path: "/sim_ws/src/stanley_avoidance/racelines/silverstone.csv"

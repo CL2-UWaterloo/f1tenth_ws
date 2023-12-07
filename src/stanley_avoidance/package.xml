@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>rrt</name>
+  <name>stanley_avoidance</name>
   <version>0.0.0</version>
-  <description>f1tenth rrt</description>
+  <description>Stanley controller with a dynamic obstacle avoidance system</description>
   <maintainer email="s36gong@uwaterloo.ca">Steven Gong</maintainer>
   <license>TODO: License declaration</license>
 

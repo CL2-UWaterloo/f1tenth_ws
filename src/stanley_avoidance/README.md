@@ -1,0 +1,1 @@
+A stanley controller which provides better tracking than the pure pursuit, equipped with a path planner to avoid obstacles using the LiDAR.

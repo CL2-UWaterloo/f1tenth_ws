@@ -7,27 +7,35 @@ import os
 def generate_launch_description():
     ld = LaunchDescription()
     config = os.path.join(
-        get_package_share_directory('pure_pursuit'),
+        get_package_share_directory('stanley_avoidance'),
         'config',
         'sim_config.yaml'
     )
 
-    pure_pursuit = Node(
-        package='pure_pursuit',
-        executable='pure_pursuit',
-        name='pure_pursuit',
+    stanley_avoidance_node = Node(
+        package='stanley_avoidance',
+        executable='stanley_avoidance',
+        name='ego_stanley_avoidance',
+        parameters=[config]
+    )
+
+    stanley_avoidance_node_opp = Node(
+        package='stanley_avoidance',
+        executable='stanley_avoidance',
+        name='opp_stanley_avoidance',
         parameters=[config]
     )
 
     waypoint_visualizer_node = Node(
         package='pure_pursuit',
-        executable='waypoint_visualizer_node',
+        executable='waypoint_visualizer',
         name='waypoint_visualizer_node',
         parameters=[config]
     )
 
     # finalize
-    ld.add_action(pure_pursuit)
+    ld.add_action(stanley_avoidance_node)
+    ld.add_action(stanley_avoidance_node_opp)
     ld.add_action(waypoint_visualizer_node)
 
     return ld

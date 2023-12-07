@@ -1,19 +1,22 @@
-pure_pursuit_node:
+pure_pursuit:
   ros__parameters:
-    waypoints_path: "/sim_ws/src/pure_pursuit/racelines/e7_floor5.csv" 
+    waypoints_path: "/sim_ws/src/pure_pursuit/racelines/e7_floor5_square.csv"
     odom_topic: "/ego_racecar/odom"
     car_refFrame: "ego_racecar/base_link"
     global_refFrame: "map"
     drive_topic: "/drive"
-    rviz_waypointselected_topic: "/waypoint_selected"
-    
+    rviz_current_waypoint_topic: "/current_waypoint"
+    rviz_lookahead_waypoint_topic: "/lookahead_waypoint"
+
     # Pure Pursuit Parameters
-    max_lookeahead: 1.0
+    # Lookahead is computed using the following: lookahead = min(max(min_lookahead, max_lookahead * curr_velocity / lookahead_ratio), max_lookahead);
+    min_lookahead: 0.5
+    max_lookahead: 3.0 # lookahead when the car is going around max velocity
+    lookahead_ratio: 8.0 # approximately the max velocity
     K_p: 0.5
     steering_limit: 25.0
-    velocity_percentage: 1.0
+    velocity_percentage: 1.0 # the limit, can only do 1 lap with clean tires
 
-
-waypoint_visualiser_node:
+waypoint_visualizer_node:
   ros__parameters:
-    waypoints_path: "/sim_ws/src/pure_pursuit/racelines/e7_floor5.csv" 
+    waypoints_path: "/sim_ws/src/pure_pursuit/racelines/e7_floor5_square.csv"
